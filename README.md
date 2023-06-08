@@ -26,7 +26,7 @@ kubeadm join 192.168.64.56:6443 --token wiquji.6obld42hwg4gojiz \
 	--discovery-token-ca-cert-hash sha256:8ee201ca1f81d0907006602f59854ca94588d5cd5dab1c6dedfd033b91dadb7d 
 ```
 
-### 网络插件
+### 网络插件(建议安装 flannel)
 ```
 --------------------------------------------------------------------------------------
 1. install flannel
