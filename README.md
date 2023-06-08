@@ -242,7 +242,7 @@ affinity:
 kubectl patch daemonset kube-proxy -n kube-system -p '{"spec": {"template": {"spec": {"affinity": {"nodeAffinity": {"requiredDuringSchedulingIgnoredDuringExecution": {"nodeSelectorTerms": [{"matchExpressions": [{"key": "node-role.kubernetes.io/edge", "operator": "DoesNotExist"}]}]}}}}}}}'
 
 
-// 打开转发路由
+// 打开转发路由(注意： 这一步可以省略)
 export CLOUDCOREIPS="192.168.64.56"
 iptables -t nat -A OUTPUT -p tcp --dport 10350 -j DNAT --to $CLOUDCOREIPS:10003
 iptables -t nat -A OUTPUT -p tcp --dport 10351 -j DNAT --to $CLOUDCOREIPS:10003
@@ -383,55 +383,6 @@ kubectl apply -f build/agent/resources/
 kubectl get all -n kubeedge -o wide
 ```
 
-# 定位问题
-
-```
-    // on master:
-    查看k8s 运行日志命令, 这个比较有用，在k8s 启动、kubeadm init、kubeadm join 阶段可以辅助分析问题。 journalctl -xefu kubelet 
-    查看驱动： systemctl show --property=Environment kubelet |cat
-    重启:     systemctl restart kubelet
-    启动:     systemctl start kubelet
-    停止:     systemctl stop kubelet
-    开机自启:  systemctl enable kubelet
-
-    dashboard 获取token: kubectl describe secret admin-user -n kubernetes-dashboard
-    kubeadm 重置， kubeadm init 命令报错，修复问题后需要重新进行 init 操作： kubeadm reset
-
-    查看存在token: kubeadm token list
-    生成永久token: kubeadm token create --ttl 0
-    测试 coredns： kubectl run busybox --image busybox: 1.28 -restart=Never --rm -it busybox -- sh
-nslookup my-web.default.sc.cluster.local
-
-
-
-    kubectl get pods -o wide -n kube-system
-    kubectl get pod podName  -o yaml | grep phase
-    kubectl describe pod PodName -n kube-system
-
-    // on edge
-    flannel 错误
-
-    https://github.com/kubeedge/kubeedge/issues/4691
-    TOKEN=`kubectl get secret -nkubeedge tokensecret -o=jsonpath='{.data.tokendata}' | base64 -d`
-    keadm join \
-    --kubeedge-version=v1.13.0 \
-    --cloudcore-ipport=192.168.50.12:10000 \
-    --token=$TOKEN \
-    --cgroupdriver=systemd \
-    --runtimetype=docker \
-    --remote-runtime-endpoint="unix:///var/run/cri-dockerd.sock"
-
-
-systemctl status edgecore.service
-systemctl restart edgecore.service
-journalctl -u edgecore.service -f
-journalctl -u edgecore.service -xe
-    
-# restart edgecore
-pkill edgecore
-systemctl restart edgecore
-```
-
 # kuboard 操作
 ## master 节点操作
 ```
@@ -515,3 +466,53 @@ nameserver xxx
 search default.svc.cluster.local svc.cluster.local cluster.local localdomain
 options ndots:5
 ```
+
+# 定位问题
+
+```
+    // on master:
+    查看k8s 运行日志命令, 这个比较有用，在k8s 启动、kubeadm init、kubeadm join 阶段可以辅助分析问题。 journalctl -xefu kubelet 
+    查看驱动： systemctl show --property=Environment kubelet |cat
+    重启:     systemctl restart kubelet
+    启动:     systemctl start kubelet
+    停止:     systemctl stop kubelet
+    开机自启:  systemctl enable kubelet
+
+    dashboard 获取token: kubectl describe secret admin-user -n kubernetes-dashboard
+    kubeadm 重置， kubeadm init 命令报错，修复问题后需要重新进行 init 操作： kubeadm reset
+
+    查看存在token: kubeadm token list
+    生成永久token: kubeadm token create --ttl 0
+    测试 coredns： kubectl run busybox --image busybox: 1.28 -restart=Never --rm -it busybox -- sh
+nslookup my-web.default.sc.cluster.local
+
+
+
+    kubectl get pods -o wide -n kube-system
+    kubectl get pod podName  -o yaml | grep phase
+    kubectl describe pod PodName -n kube-system
+
+    // on edge
+    flannel 错误
+
+    https://github.com/kubeedge/kubeedge/issues/4691
+    TOKEN=`kubectl get secret -nkubeedge tokensecret -o=jsonpath='{.data.tokendata}' | base64 -d`
+    keadm join \
+    --kubeedge-version=v1.13.0 \
+    --cloudcore-ipport=192.168.50.12:10000 \
+    --token=$TOKEN \
+    --cgroupdriver=systemd \
+    --runtimetype=docker \
+    --remote-runtime-endpoint="unix:///var/run/cri-dockerd.sock"
+
+
+systemctl status edgecore.service
+systemctl restart edgecore.service
+journalctl -u edgecore.service -f
+journalctl -u edgecore.service -xe
+    
+# restart edgecore
+pkill edgecore
+systemctl restart edgecore
+```
+
