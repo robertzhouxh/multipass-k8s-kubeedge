@@ -138,43 +138,38 @@ kubectl taint node master node-role.kubernetes.io/master-
 kubectl taint nodes --all node-role.kubernetes.io/master-
 
 ```
-### 安装/卸载 metrics-server 
+### metrics-server 
 ```
-1. 使用官方镜像地址直接安装
+1. 安装
+
+1) 使用官方镜像地址直接安装
 curl -sL https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml \
   | sed -e "s|\(\s\+\)- args:|\1- args:\n\1  - --kubelet-insecure-tls|" | kubectl apply -f -
 
-2. 使用自定义镜像地址安装
+2) 使用自定义镜像地址安装
 curl -sL https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml \
   | sed \
     -e "s|\(\s\+\)- args:|\1- args:\n\1  - --kubelet-insecure-tls|" \
     -e "s|registry.k8s.io/metrics-server|registry.cn-hangzhou.aliyuncs.com/google_containers|g" \
   | kubectl apply -f -
 
-3. 手动
+3) 手动（hostNetwork: true）
 wget https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
 kubectl apply -f component.yaml
 kubectl get deployments metrics-server -n kube-system
 kubectl patch deploy metrics-server -n kube-system --type='json' -p='[{"op":"add","path":"/spec/template/spec/containers/0/args/-","value":"--kubelet-insecure-tls"},{"op":"add","path":"/spec/template/spec/hostNetwork","value":true}]'
 
 
-4. 查看集群指标信息
+2. 验证
 kubectl top nodes
-kubectl top pods -n kube-system
+kubectl top pods -n kube-system 
+
+3. 删除 metrics-server
+kubectl delete -f components.yaml
 
 ```
 
-删除 metrics-server
-```
-kubectl delete ServiceAccount metrics-server -n kube-system
-kubectl delete ClusterRoleBinding metrics-server:system:auth-delegator -n kube-system
-kubectl delete RoleBinding metrics-server-auth-reader -n kube-system
-kubectl delete ClusterRole system:metrics-server -n kube-system
-kubectl delete ClusterRoleBinding system:metrics-server -n kube-system
-kubectl delete APIService v1beta1.metrics.k8s.io -n kube-system
-kubectl delete Service metrics-server -n kube-system
-kubectl delete Deployment metrics-server -n kube-system
-```
+
 
 ### 重置K8S
 ```
@@ -189,7 +184,7 @@ rm -f /etc/kubernetes/pki/ca.crt
 
 iptables -F && iptables -t nat -F && iptables -t mangle -F && iptables -X
 ```
-## Step3.Master 节点可视化管理
+## Step3.可视化管理
 ```
 sudo docker run -d \
   --restart=unless-stopped \
@@ -205,6 +200,10 @@ http://192.168.64.56:9090
 用户名： admin
 密码： Kuboard123
 ```
+
+Tricks: 
+mac: cat ~/.kube/config | pbcopy
+
 ## Step4.Worker节点 Join
 ```
 multipass shell e-worker
@@ -291,9 +290,8 @@ journalctl -u edgecore.service -f
 ```
 
 注：
-如果要使用containerd, 则要打开 cri，参考 https://github.com/kubeedge/kubeedge/issues/4621
-
-边缘节点开启 edgeStream
+1) 如果要使用containerd, 则要打开 cri，参考 https://github.com/kubeedge/kubeedge/issues/4621
+2) 边缘节点开启 edgeStream, 支持 metrics-server 获取子节点 cpu, mem 
 - 编辑 /etc/kubeedge/config/edgecore.yaml 文件 edgeStream字段值改为 enable: true
 - 重启 edgecore 服务，systemctl restart edgecore.service
 
