@@ -1,0 +1,15 @@
+#bootcmd:
+#  - printf "[Resolve]\nDNS=8.8.8.8" > /etc/systemd/resolved.conf
+#  - [systemctl, restart, systemd-resolved]
+
+runcmd:
+  - cp /etc/netplan/50-cloud-init.yaml /etc/netplan/50-cloud-init.yaml.bak
+  - sed -i -e '13i\\            nameservers:' /etc/netplan/50-cloud-init.yaml
+  - sed -i -e '14i\\                addresses:\ [8.8.8.8, 8.8.4.4]' /etc/netplan/50-cloud-init.yaml
+  - netplan apply
+  - systemd-resolve --status | grep 'DNS Servers' -A2
+  - DEBIAN_FRONTEND=noninteractive  apt-get update -y && apt-get upgrade -y
+  - apt-get -y autoremove
+
+final_message: "The system is finally up"
+
