@@ -3,10 +3,13 @@
 ```
 cd multipass
 
-#创建虚拟机
+//创建虚拟机
 ./launch-2vm.sh
 
-#销虚拟机
+注：  en0 表示要桥接的网卡
+multipass launch --name o-worker -c 2 -m 2G jammy --disk 30G --cloud-init systemd-resolved.yaml--network en0
+
+销虚拟机
 ./destroy.sh
 ```
 ## Step2.Master节点安装k8s
