@@ -430,3 +430,91 @@ kubectl get all -n kubeedge -o wide
 ```
 
     
+
+# kuboard 操作
+## master 节点操作
+```
+1. 操作镜像
+kubectl exec -n namespace pods-name -it -- /bin/bash
+
+2. 获取日志
+kubectl logs -n namespace pods-name
+
+3. 查看配置信息
+kubectl describe configmap -n namespace service-name
+
+4. 编辑配置信息
+kubectl edit configmap -n namespace service-name
+
+5.根据yaml创建
+kubectl create -f name.yaml
+
+6.根据yaml删除
+kubectl delete -f name.yaml
+```
+
+
+## 定制 Pod 的 DNS 策略
+
+DNS 策略可以逐个 Pod 来设定。目前 Kubernetes 支持以下特定 Pod 的 DNS 策略。 这些策略可以在 Pod 规约中的 dnsPolicy 字段设置：
+
+Default: Pod 从运行所在的节点继承名称解析配置
+ClusterFirst: 与配置的集群域后缀不匹配的任何 DNS 查询（例如 "www.kubernetes.io"） 都将转发到从节点继承的上游名称服务器。集群管理员可能配置了额外的存根域和上游 DNS 服务器。
+ClusterFirstWithHostNet：对于以 hostNetwork 方式运行的 Pod，应显式设置其 DNS 策略 "`ClusterFirstWithHostNet`"。
+None: 此设置允许 Pod 忽略 Kubernetes 环境中的 DNS 设置。Pod 会使用其 `dnsConfig` 字段 所提供的 DNS 设置。
+
+说明：** "Default" 不是默认的 DNS 策略。如果未明确指定 `dnsPolicy`，则使用 "ClusterFirst"。
+
+1. 在yaml中添加：
+
+```
+hostNetwork: true
+dnsPolicy: ClusterFirstWithHostNet
+```
+
+kubectl exec -it pod-name -n namespace -- cat /etc/resolv.conf
+nameserver 10.66.0.2 成功
+
+
+2. 同时使用 hostNetwork 与 coredns 作为 Pod 预设 DNS 配置。
+
+```
+cat dns.yml 
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dns-none
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dns
+      release: v1
+  template:
+    metadata:
+      labels:
+        app: dns
+        release: v1
+        env: test
+    spec:
+      hostNetwork: true
+      containers:
+      - name: dns
+        image: registry.cn-beijing.aliyuncs.com/google_registry/myapp:v1
+        imagePullPolicy: IfNotPresent
+        ports:
+        - name: http
+          containerPort: 80
+      dnsPolicy: ClusterFirstWithHostNet
+
+```
+
+kubectl  apply  -f dns,yml
+
+验证dns配置
+kubectl exec -it   dns-none-86nn874ba8-57sar  -n default -- cat /etc/resolv.conf
+nameserver xxx
+search default.svc.cluster.local svc.cluster.local cluster.local localdomain
+options ndots:5
+
