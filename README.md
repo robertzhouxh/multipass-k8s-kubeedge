@@ -1,7 +1,7 @@
 # k8s 环境部署
 ## Step1.macos host 管理虚拟机生命周期
 ```
-cd multipass-kubernetes/multipass
+cd multipass
 
 #创建虚拟机
 ./launch-2vm.sh
@@ -14,8 +14,8 @@ cd multipass-kubernetes/multipass
 ```
 multipass shell master
 sudo -i
-git clone https://github.com/robertzhouxh/multipass-kubernetes
-cd multipass-kubernetes/cks-master
+git clone https://github.com/robertzhouxh/multipass-k8s-kubeedge
+cd multipass-k8s-kubeedge/master-node
 ./containerd.sh
 ./docker.sh
 ./install.sh
@@ -139,7 +139,8 @@ kubectl taint nodes --all node-role.kubernetes.io/master-
 ```
 multipass shell e-worker
 
-git clone https://github.com/robertzhouxh/multipass-kubernetes
+git clone https://github.com/robertzhouxh/multipass-k8s-kubeedge
+cd multipass-k8s-kubeedge/worker-node
 ./install-all.sh
 
 kubeadm join 192.168.64.55:6443 --token pitfej.61efpxyer26iv7zo \
@@ -200,7 +201,7 @@ sudo docker run -d \
   -v /root/kuboard-data:/data \
   swr.cn-east-2.myhuaweicloud.com/kuboard/kuboard:v3
 
-http://192.168.64.56:9090/sso/auth/default?req=zbxgpuqrf3ajt3tx5clazsd6k
+http://192.168.64.56:9090
 用户名： admin
 密码： Kuboard123
 ```
@@ -242,8 +243,8 @@ PermitRootLogin yes
     PasswordAuthentication yes
 ------------------------------------------------------------------
 
-git clone https://github.com/robertzhouxh/multipass-kubernetes
-cd multipass-kubernetes/edge-worker
+git clone https://github.com/robertzhouxh/multipass-k8s-kubeedge
+cd multipass-kubernetes/edge-node
 ./docker.sh
 
 wget https://github.com/kubeedge/kubeedge/releases/download/v1.13.0/keadm-v1.13.0-linux-arm64.tar.gz
