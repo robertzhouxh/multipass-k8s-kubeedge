@@ -1,4 +1,4 @@
-# k8s 环境部署
+# k8s 部署
 ## Step1.macos host 管理虚拟机生命周期
 ```
 cd multipass
@@ -12,7 +12,7 @@ multipass launch --name o-worker -c 2 -m 2G jammy --disk 30G --cloud-init system
 销虚拟机
 ./destroy.sh
 ```
-## Step2.Master节点安装k8s
+## Step2.Master节点安装/卸载 k8s
 ### 基础套件
 ```
 multipass shell master
@@ -137,21 +137,22 @@ kubectl apply -f calico.yaml
 kubectl describe nodes master | grep Taints
 kubectl taint node master node-role.kubernetes.io/master-
 kubectl taint nodes --all node-role.kubernetes.io/master-
-```
-## Step3.Worker节点Join
-```
-multipass shell e-worker
 
-git clone https://github.com/robertzhouxh/multipass-k8s-kubeedge
-cd multipass-k8s-kubeedge/worker-node
-./install-all.sh
-
-kubeadm join 192.168.64.55:6443 --token pitfej.61efpxyer26iv7zo \
-	--discovery-token-ca-cert-hash sha256:978db90c12ee512df0d6f4bbb83bb78cab97abd6ae52a760343cf793bd87ec77 
 ```
+### 重置K8S
+```
+swapoff -a
+kubeadm reset
+systemctl daemon-reload
+systemctl restart docker kubelet
 
-## Step4.Master节点安装metrics-server 
-### 安装 metrics-server 
+rm -rf $HOME/.kube/config
+rm -f /etc/kubernetes/kubelet.conf
+rm -f /etc/kubernetes/pki/ca.crt 
+
+iptables -F && iptables -t nat -F && iptables -t mangle -F && iptables -X
+```
+## Step3.Master节点安装/卸载 metrics-server 
 ```
 1. 使用官方镜像地址直接安装
 curl -sL https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml \
@@ -166,33 +167,29 @@ curl -sL https://github.com/kubernetes-sigs/metrics-server/releases/latest/downl
 
 3. 手动
 wget https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
-vi component.yaml
-
-修改镜像地址： sed -i 's/registry.k8s.io\/metrics-server/registry.cn-hangzhou.aliyuncs.com\/google_containers/g' metrics-server-components.yaml
-修改启动参数： args添加tls证书配置选项： - --kubelet-insecure-tls
 kubectl apply -f component.yaml
 kubectl get deployments metrics-server -n kube-system
+kubectl patch deploy metrics-server -n kube-system --type='json' -p='[{"op":"add","path":"/spec/template/spec/containers/0/args/-","value":"--kubelet-insecure-tls"}]'
 
-3. 查看集群指标信息
+4. 查看集群指标信息
 kubectl top nodes
 kubectl top pods -n kube-system
 
 ```
 
-### 删除 metrics-server
-
+删除 metrics-server
 ```
 kubectl delete ServiceAccount metrics-server -n kube-system
 kubectl delete ClusterRoleBinding metrics-server:system:auth-delegator -n kube-system
 kubectl delete RoleBinding metrics-server-auth-reader -n kube-system
 kubectl delete ClusterRole system:metrics-server -n kube-system
-kubectl delete  ClusterRoleBinding system:metrics-server -n kube-system
-kubectl delete  APIService v1beta1.metrics.k8s.io -n kube-system
+kubectl delete ClusterRoleBinding system:metrics-server -n kube-system
+kubectl delete APIService v1beta1.metrics.k8s.io -n kube-system
 kubectl delete Service metrics-server -n kube-system
 kubectl delete Deployment metrics-server -n kube-system
 ```
 
-## Step5.Master 节点可视化管理
+## Step4.Master 节点可视化管理
 ```
 sudo docker run -d \
   --restart=unless-stopped \
@@ -208,21 +205,41 @@ http://192.168.64.56:9090
 用户名： admin
 密码： Kuboard123
 ```
-# kubeedge v1.13.0 安装
+## Step5.Worker节点 Join
+```
+multipass shell e-worker
+
+git clone https://github.com/robertzhouxh/multipass-k8s-kubeedge
+cd multipass-k8s-kubeedge/worker-node
+./install-all.sh
+
+kubeadm join 192.168.64.55:6443 --token pitfej.61efpxyer26iv7zo \
+	--discovery-token-ca-cert-hash sha256:978db90c12ee512df0d6f4bbb83bb78cab97abd6ae52a760343cf793bd87ec77 
+```
+# kubeedge 部署
 ## 云端-Master节点
 ```
 multipass shell master
 
-//因为cloudcore没有污点容忍，确保master节点已经去掉污点
+/--------------------------  因为cloudcore没有污点容忍，确保master节点已经去掉污点  -------------------------------------\
+
 wget https://github.com/kubeedge/kubeedge/releases/download/v1.13.0/keadm-v1.13.0-linux-arm64.tar.gz
 tar xzvf keadm-v1.13.0-linux-arm64.tar.gz && cp keadm-v1.13.0-linux-arm64/keadm/keadm /usr/sbin/
 keadm init --advertise-address=192.168.64.56 --kube-config=$HOME/.kube/config --kubeedge-version=1.13.0
 
-//check
-netstat -tpnl | grep cloudcore
+// 边缘节点上不执行kube-proxy
+kubectl get daemonset -n kube-system | grep -v NAME | awk '{print $1}' |xargs -n 1 kubectl patch daemonset -n kube-system --type='json' -p='[{"op":"replace","path":"/spec/template/spec/affinity","value":{"nodeAffinity":{"requireDuringSchedulingIgnoredDuringExecution":{"nodeSelectorTerms":[{"matchExpressions":[{"key":"node-role.kubernetes.io/edge","operator":"DoesNotExist"}]}]}}}}]'
+
+// 打开转发路由
+CLOUDCOREIPS=192.168.64.56
+iptables -t nat -A OUTPUT -p tcp --dport 10351 -j DNAT --to $CLOUDCOREIPS:10003
+
+// 验证
+netstat -nltp | grep cloudcore
 kubectl get pod -n kubeedge
 
-// reboot cloudcore
+// 重启 cloudcore
+pkill cloudcore
 systemctl restart cloudcore.service
 
 // 获取token
@@ -234,7 +251,7 @@ keadm gettoken
 - cloudcore.service(https://raw.githubusercontent.com/kubeedge/kubeedge/master/build/tools/cloudcore.service)
 - weave 网络插件问题：https://github.com/kubeedge/kubeedge/issues/4161
 
-## 边端-Worker节点
+## 边端-Worker节点 Join
 
 ```
 multipass shell e-node
@@ -278,57 +295,6 @@ journalctl -u edgecore.service -f
 edgecore 服务正常： keadm reset
 edgecore 服务退出： systemctl disable edgecore.service && rm /etc/systemd/system/edgecore.service && rm -r /etc/kubeedge && docker rm -f mqtt
 on Master  删节点： kubectl delete node e-node
-
-## 定位问题
-
-```
-// on master:
-查看k8s 运行日志命令, 这个比较有用，在k8s 启动、kubeadm init、kubeadm join 阶段可以辅助分析问题。 journalctl -xefu kubelet 
-查看驱动： systemctl show --property=Environment kubelet |cat
-重启:     systemctl restart kubelet
-启动:     systemctl start kubelet
-停止:     systemctl stop kubelet
-开机自启:  systemctl enable kubelet
-
-dashboard 获取token: kubectl describe secret admin-user -n kubernetes-dashboard
-kubeadm 重置， kubeadm init 命令报错，修复问题后需要重新进行 init 操作： kubeadm reset
-
-查看存在token: kubeadm token list
-生成永久token: kubeadm token create --ttl 0
-测试 coredns： kubectl run busybox --image busybox: 1.28 -restart=Never --rm -it busybox -- sh
-              nslookup my-web.default.sc.cluster.local
-
-
-
-kubectl get pods -o wide -n kube-system
-kubectl get pod podName  -o yaml | grep phase
-kubectl describe pod PodName -n kube-system
-
-// on edge
-flannel 错误
-
-https://github.com/kubeedge/kubeedge/issues/4691
-TOKEN=`kubectl get secret -nkubeedge tokensecret -o=jsonpath='{.data.tokendata}' | base64 -d`
-keadm join \
-    --kubeedge-version=v1.13.0 \
-    --cloudcore-ipport=192.168.50.12:10000 \
-	--token=$TOKEN \
-	--cgroupdriver=systemd \
-	--runtimetype=docker \
-	--remote-runtime-endpoint="unix:///var/run/cri-dockerd.sock"
-
-
-systemctl status edgecore.service
-systemctl restart edgecore.service
-journalctl -u edgecore.service -f
-journalctl -u edgecore.service -xe
-    
-# 杀掉当前edgecore进程
-pkill edgecore
-
-# 重启edgecore
-systemctl restart edgecore
-```
 
 ## 边云-Edgemesh
 ### 前置准备
@@ -428,8 +394,56 @@ kubectl apply -f build/agent/resources/
 验证
 kubectl get all -n kubeedge -o wide
 ```
+# 定位问题
 
+```
+// on master:
+查看k8s 运行日志命令, 这个比较有用，在k8s 启动、kubeadm init、kubeadm join 阶段可以辅助分析问题。 journalctl -xefu kubelet 
+查看驱动： systemctl show --property=Environment kubelet |cat
+重启:     systemctl restart kubelet
+启动:     systemctl start kubelet
+停止:     systemctl stop kubelet
+开机自启:  systemctl enable kubelet
+
+dashboard 获取token: kubectl describe secret admin-user -n kubernetes-dashboard
+kubeadm 重置， kubeadm init 命令报错，修复问题后需要重新进行 init 操作： kubeadm reset
+
+查看存在token: kubeadm token list
+生成永久token: kubeadm token create --ttl 0
+测试 coredns： kubectl run busybox --image busybox: 1.28 -restart=Never --rm -it busybox -- sh
+              nslookup my-web.default.sc.cluster.local
+
+
+
+kubectl get pods -o wide -n kube-system
+kubectl get pod podName  -o yaml | grep phase
+kubectl describe pod PodName -n kube-system
+
+// on edge
+flannel 错误
+
+https://github.com/kubeedge/kubeedge/issues/4691
+TOKEN=`kubectl get secret -nkubeedge tokensecret -o=jsonpath='{.data.tokendata}' | base64 -d`
+keadm join \
+    --kubeedge-version=v1.13.0 \
+    --cloudcore-ipport=192.168.50.12:10000 \
+	--token=$TOKEN \
+	--cgroupdriver=systemd \
+	--runtimetype=docker \
+	--remote-runtime-endpoint="unix:///var/run/cri-dockerd.sock"
+
+
+systemctl status edgecore.service
+systemctl restart edgecore.service
+journalctl -u edgecore.service -f
+journalctl -u edgecore.service -xe
     
+# 杀掉当前edgecore进程
+pkill edgecore
+
+# 重启edgecore
+systemctl restart edgecore
+```
 
 # kuboard 操作
 ## master 节点操作
