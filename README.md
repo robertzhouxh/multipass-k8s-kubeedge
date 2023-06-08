@@ -19,14 +19,11 @@ multipass shell master
 sudo -i
 git clone https://github.com/robertzhouxh/multipass-k8s-kubeedge
 cd multipass-k8s-kubeedge/master-node
-./containerd.sh
-./docker.sh
-./install.sh
+./install-all
 
 // 记录
-kubeadm join 192.168.64.56:6443 --token a3g8ta.wpxwlrozkq6dzn22 \
-	--discovery-token-ca-cert-hash sha256:291fa76a6401a544bc66f32560b4a17e808e1359ad8cde535a56e8d0f2c65646 
-
+kubeadm join 192.168.64.56:6443 --token wiquji.6obld42hwg4gojiz \
+	--discovery-token-ca-cert-hash sha256:8ee201ca1f81d0907006602f59854ca94588d5cd5dab1c6dedfd033b91dadb7d 
 ```
 
 ### 网络插件
@@ -44,6 +41,8 @@ tar xf cni-plugins-linux-arm64-v1.3.0.tgz -C /opt/cni/bin
 wget https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml
 kubectl apply -f kube-flannel.yml
 
+
+或者：
 // disable flannel in edge node, because it connect to kube-apiserver directly.
 kubectl edit ds -n kube-system kube-flannel-ds
 ...
@@ -67,7 +66,7 @@ spec:
 // 验证
 kubectl get pods -n kube-flannel
 
-kc edit cm -nkube-system kube-proxy
+kc edit cm -n kube-system kube-proxy
  ...
  kubeconfig.conf: |-
    apiVersion: v1
@@ -139,20 +138,7 @@ kubectl taint node master node-role.kubernetes.io/master-
 kubectl taint nodes --all node-role.kubernetes.io/master-
 
 ```
-### 重置K8S
-```
-swapoff -a
-kubeadm reset
-systemctl daemon-reload
-systemctl restart docker kubelet
-
-rm -rf $HOME/.kube/config
-rm -f /etc/kubernetes/kubelet.conf
-rm -f /etc/kubernetes/pki/ca.crt 
-
-iptables -F && iptables -t nat -F && iptables -t mangle -F && iptables -X
-```
-## Step3.Master节点安装/卸载 metrics-server 
+### 安装/卸载 metrics-server 
 ```
 1. 使用官方镜像地址直接安装
 curl -sL https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml \
@@ -169,7 +155,8 @@ curl -sL https://github.com/kubernetes-sigs/metrics-server/releases/latest/downl
 wget https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
 kubectl apply -f component.yaml
 kubectl get deployments metrics-server -n kube-system
-kubectl patch deploy metrics-server -n kube-system --type='json' -p='[{"op":"add","path":"/spec/template/spec/containers/0/args/-","value":"--kubelet-insecure-tls"}]'
+kubectl patch deploy metrics-server -n kube-system --type='json' -p='[{"op":"add","path":"/spec/template/spec/containers/0/args/-","value":"--kubelet-insecure-tls"},{"op":"add","path":"/spec/template/spec/hostNetwork","value":true}]'
+
 
 4. 查看集群指标信息
 kubectl top nodes
@@ -189,7 +176,20 @@ kubectl delete Service metrics-server -n kube-system
 kubectl delete Deployment metrics-server -n kube-system
 ```
 
-## Step4.Master 节点可视化管理
+### 重置K8S
+```
+swapoff -a
+kubeadm reset
+systemctl daemon-reload
+systemctl restart docker kubelet
+
+rm -rf $HOME/.kube/config
+rm -f /etc/kubernetes/kubelet.conf
+rm -f /etc/kubernetes/pki/ca.crt 
+
+iptables -F && iptables -t nat -F && iptables -t mangle -F && iptables -X
+```
+## Step3.Master 节点可视化管理
 ```
 sudo docker run -d \
   --restart=unless-stopped \
@@ -205,7 +205,7 @@ http://192.168.64.56:9090
 用户名： admin
 密码： Kuboard123
 ```
-## Step5.Worker节点 Join
+## Step4.Worker节点 Join
 ```
 multipass shell e-worker
 
@@ -228,22 +228,31 @@ tar xzvf keadm-v1.13.0-linux-arm64.tar.gz && cp keadm-v1.13.0-linux-arm64/keadm/
 keadm init --advertise-address=192.168.64.56 --kube-config=$HOME/.kube/config --kubeedge-version=1.13.0
 
 // 边缘节点上不执行kube-proxy
-kubectl get daemonset -n kube-system | grep -v NAME | awk '{print $1}' |xargs -n 1 kubectl patch daemonset -n kube-system --type='json' -p='[{"op":"replace","path":"/spec/template/spec/affinity","value":{"nodeAffinity":{"requireDuringSchedulingIgnoredDuringExecution":{"nodeSelectorTerms":[{"matchExpressions":[{"key":"node-role.kubernetes.io/edge","operator":"DoesNotExist"}]}]}}}}]'
+kubectl edit daemonsets.apps -n kube-system kube-proxy
+
+affinity:
+  nodeAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: node-role.kubernetes.io/edge
+          operator: DoesNotExist
+
+
+或者采用以下patch
+kubectl patch daemonset kube-proxy -n kube-system -p '{"spec": {"template": {"spec": {"affinity": {"nodeAffinity": {"requiredDuringSchedulingIgnoredDuringExecution": {"nodeSelectorTerms": [{"matchExpressions": [{"key": "node-role.kubernetes.io/edge", "operator": "DoesNotExist"}]}]}}}}}}}'
+
 
 // 打开转发路由
-CLOUDCOREIPS=192.168.64.56
+export CLOUDCOREIPS="192.168.64.56"
+iptables -t nat -A OUTPUT -p tcp --dport 10350 -j DNAT --to $CLOUDCOREIPS:10003
 iptables -t nat -A OUTPUT -p tcp --dport 10351 -j DNAT --to $CLOUDCOREIPS:10003
 
 // 验证
 netstat -nltp | grep cloudcore
-kubectl get pod -n kubeedge
 
 // 重启 cloudcore
 pkill cloudcore
-systemctl restart cloudcore.service
-
-// 获取token
-keadm gettoken
 ```
 
 注： 如果因为网络原因导致初始化失败，则可以提前把相关文件下载到/etc/kubeedge/
@@ -264,77 +273,75 @@ PermitRootLogin yes
 ------------------------------------------------------------------
 
 git clone https://github.com/robertzhouxh/multipass-k8s-kubeedge
-cd multipass-kubernetes/edge-node
+cd edge-node
 ./docker.sh
 
 wget https://github.com/kubeedge/kubeedge/releases/download/v1.13.0/keadm-v1.13.0-linux-arm64.tar.gz
 tar xzvf keadm-v1.13.0-linux-arm64.tar.gz && cp keadm-v1.13.0-linux-arm64/keadm/keadm /usr/sbin/
 
-
 keadm join --cloudcore-ipport=192.168.64.56:10000 --kubeedge-version=1.13.0 --token=$(keadm gettoken)  --edgenode-name=e-node --runtimetype=docker --remote-runtime-endpoint unix:///run/containerd/containerd.sock
 
 eg:
-keadm join --cloudcore-ipport=192.168.64.56:10000 --kubeedge-version=1.13.0 --token=34b265f92b2c30025c9ecafa0d372db7d7ae8d0a64da9d5a8fd1c96fbb5ab972.eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE2ODYyMDMxMjV9.J9P__HaSFqiQovL-uNUk9NvOR-oqxFtpS6n8R35Em0I --edgenode-name=e-node --runtimetype=docker --remote-runtime-endpoint unix:///run/containerd/containerd.sock
+keadm join --cloudcore-ipport=192.168.64.56:10000 --kubeedge-version=1.13.0 --token=49f7671edd89e624056f0b661e07e7cb57c2ca0eb51b4568a8dd19bdc8d2963a.eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE2ODYyOTgxMjl9.y7Cr4WIoC8NLrUDBpOG7lTK8PtvaWcoOaryCk0qyNCg --edgenode-name=e-node --runtimetype=docker --remote-runtime-endpoint unix:///run/containerd/containerd.sock
 
-
-// reboot cloudcore
-systemctl restart cloudcore.service
+// reboot edgecore
+systemctl restart edgecore.service
 systemctl status edgecore.service
 journalctl -u edgecore.service -f
 ```
 
 注：
 如果要使用containerd, 则要打开 cri，参考 https://github.com/kubeedge/kubeedge/issues/4621
-开启 edgeStream，
-  - 编辑 /etc/kubeedge/config/edgecore.yaml 文件
-  - 找到 edgeStream字段，将 enable: false 改为 enable: true
-  - 保存文件，重启 edgecore 服务，systemctl restart edgecore.service
+
+边缘节点开启 edgeStream
+- 编辑 /etc/kubeedge/config/edgecore.yaml 文件 edgeStream字段值改为 enable: true
+- 重启 edgecore 服务，systemctl restart edgecore.service
 
 ### 卸载EdgeCore
 
-edgecore 服务正常： keadm reset
-edgecore 服务退出： systemctl disable edgecore.service && rm /etc/systemd/system/edgecore.service && rm -r /etc/kubeedge && docker rm -f mqtt
-on Master  删节点： kubectl delete node e-node
+    edgecore 服务正常： keadm reset
+    edgecore 服务退出： systemctl disable edgecore.service && rm /etc/systemd/system/edgecore.service && rm -r /etc/kubeedge && docker rm -f mqtt
+    on Master  删节点： kubectl delete node e-node
 
 ## 边云-Edgemesh
 ### 前置准备
 
-```
-步骤1: 去除 K8s master 节点的污点
-kubectl taint nodes --all node-role.kubernetes.io/master-
+    ```
+    步骤1: 去除 K8s master 节点的污点
+    kubectl taint nodes --all node-role.kubernetes.io/master-
 
-步骤2: 给 Kubernetes API 服务添加过滤标签
-kubectl label services kubernetes service.edgemesh.kubeedge.io/service-proxy-name=""
+    步骤2: 给 Kubernetes API 服务添加过滤标签
+    kubectl label services kubernetes service.edgemesh.kubeedge.io/service-proxy-name=""
 
-步骤3: 启用 KubeEdge 的边缘 Kube-API 端点服务
+    步骤3: 启用 KubeEdge 的边缘 Kube-API 端点服务
 
-3.1 在云端，开启 dynamicController 模块，配置完成后，需要重启 cloudcore
+    3.1 在云端，开启 dynamicController 模块，配置完成后，需要重启 cloudcore
 
-1)keadm安装的通过以下指令修改： kubectl edit cm -n kubeedge cloudcore
-//修改
-modules:
-  ...
-  dynamicController:
-    enable: true
+    1)keadm安装的通过以下指令修改： kubectl edit cm -n kubeedge cloudcore
+    //修改
+    modules:
+...
+dynamicController:
+        enable: true
+    ...
+
+    // 执行完后,检查一下
+    // 如果不放心，直接去kuboard在kubeedge上把cloudcore删除掉，然后会根据新的模板创建新的容器
+    kubectl describe cm -n kubeedge cloudcore
+
+    2) 其他方式安装的
+    vim /etc/kubeedge/config/cloudcore.yaml
+    modules:
+...
+dynamicController:
+        enable: true
 ...
 
-// 执行完后,检查一下
-// 如果不放心，直接去kuboard在kubeedge上把cloudcore删除掉，然后会根据新的模板创建新的容器
-kubectl describe cm -n kubeedge cloudcore
+    // 重启cloudcore
+    pkill cloudcore
+    systemctl restart cloudcore
 
-2) 其他方式安装的
-vim /etc/kubeedge/config/cloudcore.yaml
-modules:
-  ...
-  dynamicController:
-    enable: true
-  ...
-
-// 重启cloudcore
-pkill cloudcore
-systemctl restart cloudcore
-
-3.2: 在边缘，打开 metaServer 模块，完成后重启 edgecore
+    3.2: 在边缘，打开 metaServer 模块，完成后重启 edgecore
 vim /etc/kubeedge/config/edgecore.yaml
   metaManager:
     metaServer:
@@ -363,9 +370,7 @@ curl 127.0.0.1:10550/api/v1/services
 ```
 
 ### 安装
-
 ```
-
 git clone https://github.com/kubeedge/edgemesh.git
 cd edgemesh
 
@@ -373,7 +378,7 @@ cd edgemesh
 kubectl apply -f build/crds/istio/
 
 // 部署edgemesh agent
-请根据你的 K8s 集群设置 relayNodes，并重新生成 PSK 密码
+// 请根据你的 K8s 集群设置 relayNodes，并重新生成 PSK 密码
 vim build/agent/resources/04-configmap.yaml
 
    relayNodes:
@@ -387,44 +392,43 @@ vim build/agent/resources/04-configmap.yaml
 
 +   psk: $(openssl rand -base64 32)
 
-
 kubectl apply -f build/agent/resources/
 
-
-验证
+// 验证
 kubectl get all -n kubeedge -o wide
 ```
+
 # 定位问题
 
-```
-// on master:
-查看k8s 运行日志命令, 这个比较有用，在k8s 启动、kubeadm init、kubeadm join 阶段可以辅助分析问题。 journalctl -xefu kubelet 
-查看驱动： systemctl show --property=Environment kubelet |cat
-重启:     systemctl restart kubelet
-启动:     systemctl start kubelet
-停止:     systemctl stop kubelet
-开机自启:  systemctl enable kubelet
+    ```
+    // on master:
+    查看k8s 运行日志命令, 这个比较有用，在k8s 启动、kubeadm init、kubeadm join 阶段可以辅助分析问题。 journalctl -xefu kubelet 
+    查看驱动： systemctl show --property=Environment kubelet |cat
+    重启:     systemctl restart kubelet
+    启动:     systemctl start kubelet
+    停止:     systemctl stop kubelet
+    开机自启:  systemctl enable kubelet
 
-dashboard 获取token: kubectl describe secret admin-user -n kubernetes-dashboard
-kubeadm 重置， kubeadm init 命令报错，修复问题后需要重新进行 init 操作： kubeadm reset
+    dashboard 获取token: kubectl describe secret admin-user -n kubernetes-dashboard
+    kubeadm 重置， kubeadm init 命令报错，修复问题后需要重新进行 init 操作： kubeadm reset
 
-查看存在token: kubeadm token list
-生成永久token: kubeadm token create --ttl 0
-测试 coredns： kubectl run busybox --image busybox: 1.28 -restart=Never --rm -it busybox -- sh
-              nslookup my-web.default.sc.cluster.local
+    查看存在token: kubeadm token list
+    生成永久token: kubeadm token create --ttl 0
+    测试 coredns： kubectl run busybox --image busybox: 1.28 -restart=Never --rm -it busybox -- sh
+nslookup my-web.default.sc.cluster.local
 
 
 
-kubectl get pods -o wide -n kube-system
-kubectl get pod podName  -o yaml | grep phase
-kubectl describe pod PodName -n kube-system
+    kubectl get pods -o wide -n kube-system
+    kubectl get pod podName  -o yaml | grep phase
+    kubectl describe pod PodName -n kube-system
 
-// on edge
-flannel 错误
+    // on edge
+    flannel 错误
 
-https://github.com/kubeedge/kubeedge/issues/4691
-TOKEN=`kubectl get secret -nkubeedge tokensecret -o=jsonpath='{.data.tokendata}' | base64 -d`
-keadm join \
+    https://github.com/kubeedge/kubeedge/issues/4691
+    TOKEN=`kubectl get secret -nkubeedge tokensecret -o=jsonpath='{.data.tokendata}' | base64 -d`
+    keadm join \
     --kubeedge-version=v1.13.0 \
     --cloudcore-ipport=192.168.50.12:10000 \
 	--token=$TOKEN \
@@ -443,7 +447,7 @@ pkill edgecore
 
 # 重启edgecore
 systemctl restart edgecore
-```
+    ```
 
 # kuboard 操作
 ## master 节点操作
@@ -465,41 +469,39 @@ kubectl create -f name.yaml
 
 6.根据yaml删除
 kubectl delete -f name.yaml
-```
-
-
+    ```
 ## 定制 Pod 的 DNS 策略
 
-DNS 策略可以逐个 Pod 来设定。目前 Kubernetes 支持以下特定 Pod 的 DNS 策略。 这些策略可以在 Pod 规约中的 dnsPolicy 字段设置：
+    DNS 策略可以逐个 Pod 来设定。目前 Kubernetes 支持以下特定 Pod 的 DNS 策略。 这些策略可以在 Pod 规约中的 dnsPolicy 字段设置：
 
-Default: Pod 从运行所在的节点继承名称解析配置
-ClusterFirst: 与配置的集群域后缀不匹配的任何 DNS 查询（例如 "www.kubernetes.io"） 都将转发到从节点继承的上游名称服务器。集群管理员可能配置了额外的存根域和上游 DNS 服务器。
-ClusterFirstWithHostNet：对于以 hostNetwork 方式运行的 Pod，应显式设置其 DNS 策略 "`ClusterFirstWithHostNet`"。
-None: 此设置允许 Pod 忽略 Kubernetes 环境中的 DNS 设置。Pod 会使用其 `dnsConfig` 字段 所提供的 DNS 设置。
+    Default: Pod 从运行所在的节点继承名称解析配置
+    ClusterFirst: 与配置的集群域后缀不匹配的任何 DNS 查询（例如 "www.kubernetes.io"） 都将转发到从节点继承的上游名称服务器。集群管理员可能配置了额外的存根域和上游 DNS 服务器。
+    ClusterFirstWithHostNet：对于以 hostNetwork 方式运行的 Pod，应显式设置其 DNS 策略 "`ClusterFirstWithHostNet`"。
+    None: 此设置允许 Pod 忽略 Kubernetes 环境中的 DNS 设置。Pod 会使用其 `dnsConfig` 字段 所提供的 DNS 设置。
 
-说明：** "Default" 不是默认的 DNS 策略。如果未明确指定 `dnsPolicy`，则使用 "ClusterFirst"。
+    说明：** "Default" 不是默认的 DNS 策略。如果未明确指定 `dnsPolicy`，则使用 "ClusterFirst"。
 
-1. 在yaml中添加：
+    1. 在yaml中添加：
 
-```
+    ```
 hostNetwork: true
 dnsPolicy: ClusterFirstWithHostNet
-```
+    ```
 
-kubectl exec -it pod-name -n namespace -- cat /etc/resolv.conf
-nameserver 10.66.0.2 成功
+    kubectl exec -it pod-name -n namespace -- cat /etc/resolv.conf
+    nameserver 10.66.0.2 成功
 
 
-2. 同时使用 hostNetwork 与 coredns 作为 Pod 预设 DNS 配置。
+    2. 同时使用 hostNetwork 与 coredns 作为 Pod 预设 DNS 配置。
 
-```
-cat dns.yml 
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: dns-none
-  namespace: default
-spec:
+    ```
+    cat dns.yml 
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+name: dns-none
+namespace: default
+    spec:
   replicas: 1
   selector:
     matchLabels:
@@ -522,13 +524,13 @@ spec:
           containerPort: 80
       dnsPolicy: ClusterFirstWithHostNet
 
-```
+    ```
 
-kubectl  apply  -f dns,yml
+    kubectl  apply  -f dns,yml
 
-验证dns配置
-kubectl exec -it   dns-none-86nn874ba8-57sar  -n default -- cat /etc/resolv.conf
-nameserver xxx
-search default.svc.cluster.local svc.cluster.local cluster.local localdomain
-options ndots:5
+    验证dns配置
+    kubectl exec -it   dns-none-86nn874ba8-57sar  -n default -- cat /etc/resolv.conf
+    nameserver xxx
+    search default.svc.cluster.local svc.cluster.local cluster.local localdomain
+    options ndots:5
 
