@@ -302,72 +302,60 @@ journalctl -u edgecore.service -f
     on Master  删节点： kubectl delete node e-node
 
 ## 边云-Edgemesh
-### 前置准备
+### Master+Node 节点前置条件
 
     ```
-    步骤1: 去除 K8s master 节点的污点
+    1. 去除 K8s master 节点的污点
     kubectl taint nodes --all node-role.kubernetes.io/master-
 
-    步骤2: 给 Kubernetes API 服务添加过滤标签
+    2: 给 Kubernetes API 服务添加过滤标签
     kubectl label services kubernetes service.edgemesh.kubeedge.io/service-proxy-name=""
 
-    步骤3: 启用 KubeEdge 的边缘 Kube-API 端点服务
+    3. 启用 KubeEdge 的边缘 Kube-API 端点服务
 
     3.1 在云端，开启 dynamicController 模块，配置完成后，需要重启 cloudcore
 
-    1)keadm安装的通过以下指令修改： kubectl edit cm -n kubeedge cloudcore
-    //修改
-    modules:
-...
-dynamicController:
-        enable: true
-    ...
+         1)keadm安装的通过以下指令修改： kubectl edit cm -n kubeedge cloudcore
+             dynamicController: 
+                 enable: false -> true
+         //检查一下， 如果不放心， 直接去kuboard在kubeedge上把cloudcore删掉，然后会根据新的模板创建新的容器
+         kubectl describe cm -n kubeedge cloudcore
 
-    // 执行完后,检查一下
-    // 如果不放心，直接去kuboard在kubeedge上把cloudcore删除掉，然后会根据新的模板创建新的容器
-    kubectl describe cm -n kubeedge cloudcore
+         2) 其他方式安装的： vim /etc/kubeedge/config/cloudcore.yaml
+             dynamicController:
+                 enable: true -> true
 
-    2) 其他方式安装的
-    vim /etc/kubeedge/config/cloudcore.yaml
-    modules:
-...
-dynamicController:
-        enable: true
-...
+         // 重启cloudcore
+         pkill cloudcore
+         systemctl restart cloudcore
 
-    // 重启cloudcore
-    pkill cloudcore
-    systemctl restart cloudcore
+    3.2: 在边缘
+        打开 metaServer 模块，完成后重启 edgecore
+        vim /etc/kubeedge/config/edgecore.yaml
+          metaManager:
+            metaServer:
+        +     enable: true
 
-    3.2: 在边缘，打开 metaServer 模块，完成后重启 edgecore
-vim /etc/kubeedge/config/edgecore.yaml
-  metaManager:
-    metaServer:
-+     enable: true
-
-添加 edgemesh commonconfig 信息：
-$ vim /etc/kubeedge/config/edgecore.yaml
-
-edged:
-  ...
-  tailoredKubeletConfig:
-    ...
-+   clusterDNS:
-+   - 169.254.96.16
-    clusterDomain: cluster.local
-
-
-//重启edgecore
-pkill edgecore
-systemctl restart edgecore
-
-
-步骤4: 最后，在边缘节点，测试边缘 Kube-API 端点功能是否正常
-curl 127.0.0.1:10550/api/v1/services
-
+        添加 edgemesh commonconfig 信息：
+        vim /etc/kubeedge/config/edgecore.yaml
+        
+        edged:
+          ...
+          tailoredKubeletConfig:
+            ...
+        +   clusterDNS:
+        +   - 169.254.96.16
+            clusterDomain: cluster.local
+    
+    //重启edgecore
+    pkill edgecore
+    systemctl restart edgecore
 ```
 
-### 安装
+在边缘节点，测试边缘 Kube-API 端点功能是否正常
+curl 127.0.0.1:10550/api/v1/services
+
+### Master 节点安装
 ```
 git clone https://github.com/kubeedge/edgemesh.git
 cd edgemesh
@@ -376,17 +364,16 @@ cd edgemesh
 kubectl apply -f build/crds/istio/
 
 // 部署edgemesh agent
-// 请根据你的 K8s 集群设置 relayNodes，并重新生成 PSK 密码
 vim build/agent/resources/04-configmap.yaml
 
    relayNodes:
    - nodeName: master
     advertiseAddress:
-    - 192.168.64.56
++   - 192.168.64.56
     - nodeName: kubeedge
-    advertiseAddress:
-    - 172.23.70.34
-    - 172.23.70.12
+    #advertiseAddress:
+    #- x.x.x.x
+    #- a.b.c.d
 
 +   psk: $(openssl rand -base64 32)
 
@@ -398,7 +385,7 @@ kubectl get all -n kubeedge -o wide
 
 # 定位问题
 
-    ```
+```
     // on master:
     查看k8s 运行日志命令, 这个比较有用，在k8s 启动、kubeadm init、kubeadm join 阶段可以辅助分析问题。 journalctl -xefu kubelet 
     查看驱动： systemctl show --property=Environment kubelet |cat
@@ -429,10 +416,10 @@ nslookup my-web.default.sc.cluster.local
     keadm join \
     --kubeedge-version=v1.13.0 \
     --cloudcore-ipport=192.168.50.12:10000 \
-	--token=$TOKEN \
-	--cgroupdriver=systemd \
-	--runtimetype=docker \
-	--remote-runtime-endpoint="unix:///var/run/cri-dockerd.sock"
+    --token=$TOKEN \
+    --cgroupdriver=systemd \
+    --runtimetype=docker \
+    --remote-runtime-endpoint="unix:///var/run/cri-dockerd.sock"
 
 
 systemctl status edgecore.service
@@ -440,12 +427,10 @@ systemctl restart edgecore.service
 journalctl -u edgecore.service -f
 journalctl -u edgecore.service -xe
     
-# 杀掉当前edgecore进程
+# restart edgecore
 pkill edgecore
-
-# 重启edgecore
 systemctl restart edgecore
-    ```
+```
 
 # kuboard 操作
 ## master 节点操作
@@ -470,36 +455,35 @@ kubectl delete -f name.yaml
     ```
 ## 定制 Pod 的 DNS 策略
 
-    DNS 策略可以逐个 Pod 来设定。目前 Kubernetes 支持以下特定 Pod 的 DNS 策略。 这些策略可以在 Pod 规约中的 dnsPolicy 字段设置：
+DNS 策略可以逐个 Pod 来设定。目前 Kubernetes 支持以下特定 Pod 的 DNS 策略。 这些策略可以在 Pod 规约中的 dnsPolicy 字段设置：
+- Default: Pod 从运行所在的节点继承名称解析配置
+- ClusterFirst: 与配置的集群域后缀不匹配的任何 DNS 查询（例如 "www.kubernetes.io"） 都转发到从节点继承的上游名称服务器。集群管理员可能配置了额外的存根域和上游 DNS 服务器。
+- ClusterFirstWithHostNet：对于以 hostNetwork 方式运行的 Pod，应显式设置其 DNS 策略 "`ClusterFirstWithHostNet`"。
+- None: 此设置允许 Pod 忽略 Kubernetes 环境中的 DNS 设置。Pod 会使用其 `dnsConfig` 字段 所提供的 DNS 设置。
 
-    Default: Pod 从运行所在的节点继承名称解析配置
-    ClusterFirst: 与配置的集群域后缀不匹配的任何 DNS 查询（例如 "www.kubernetes.io"） 都将转发到从节点继承的上游名称服务器。集群管理员可能配置了额外的存根域和上游 DNS 服务器。
-    ClusterFirstWithHostNet：对于以 hostNetwork 方式运行的 Pod，应显式设置其 DNS 策略 "`ClusterFirstWithHostNet`"。
-    None: 此设置允许 Pod 忽略 Kubernetes 环境中的 DNS 设置。Pod 会使用其 `dnsConfig` 字段 所提供的 DNS 设置。
+说明：** "Default" 不是默认的 DNS 策略。如果未明确指定 `dnsPolicy`，则使用 "ClusterFirst"。
 
-    说明：** "Default" 不是默认的 DNS 策略。如果未明确指定 `dnsPolicy`，则使用 "ClusterFirst"。
+1. 在 pod 的 yaml 中添加：
 
-    1. 在yaml中添加：
-
-    ```
+```
 hostNetwork: true
 dnsPolicy: ClusterFirstWithHostNet
-    ```
+```
 
-    kubectl exec -it pod-name -n namespace -- cat /etc/resolv.conf
-    nameserver 10.66.0.2 成功
+kubectl exec -it pod-name -n namespace -- cat /etc/resolv.conf
+nameserver 10.66.0.2 成功
 
 
-    2. 同时使用 hostNetwork 与 coredns 作为 Pod 预设 DNS 配置。
+2. 同时使用 hostNetwork 与 coredns 作为 Pod 预设 DNS 配置。
 
-    ```
-    cat dns.yml 
-    apiVersion: apps/v1
-    kind: Deployment
-    metadata:
-name: dns-none
-namespace: default
-    spec:
+```
+cat dns.yml 
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dns-none
+  namespace: default
+spec:
   replicas: 1
   selector:
     matchLabels:
@@ -521,14 +505,13 @@ namespace: default
         - name: http
           containerPort: 80
       dnsPolicy: ClusterFirstWithHostNet
+```
+kubectl  apply  -f dns,yml
 
-    ```
-
-    kubectl  apply  -f dns,yml
-
-    验证dns配置
-    kubectl exec -it   dns-none-86nn874ba8-57sar  -n default -- cat /etc/resolv.conf
-    nameserver xxx
-    search default.svc.cluster.local svc.cluster.local cluster.local localdomain
-    options ndots:5
-
+验证dns配置
+```
+kubectl exec -it   dns-none-86nn874ba8-57sar  -n default -- cat /etc/resolv.conf
+nameserver xxx
+search default.svc.cluster.local svc.cluster.local cluster.local localdomain
+options ndots:5
+```
