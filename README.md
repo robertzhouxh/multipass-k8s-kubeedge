@@ -138,26 +138,26 @@ kubectl taint node master node-role.kubernetes.io/master-
 kubectl taint nodes --all node-role.kubernetes.io/master-
 
 ```
-### metrics-server 
+### metrics-server( 必须在Master节点 )
 ```
 1. 安装
 
-1) 使用官方镜像地址直接安装
-curl -sL https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml \
-  | sed -e "s|\(\s\+\)- args:|\1- args:\n\1  - --kubelet-insecure-tls|" | kubectl apply -f -
-
-2) 使用自定义镜像地址安装
-curl -sL https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml \
-  | sed \
-    -e "s|\(\s\+\)- args:|\1- args:\n\1  - --kubelet-insecure-tls|" \
-    -e "s|registry.k8s.io/metrics-server|registry.cn-hangzhou.aliyuncs.com/google_containers|g" \
-  | kubectl apply -f -
-
-3) 手动（hostNetwork: true）
-wget https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
-kubectl apply -f component.yaml
-kubectl get deployments metrics-server -n kube-system
-kubectl patch deploy metrics-server -n kube-system --type='json' -p='[{"op":"add","path":"/spec/template/spec/containers/0/args/-","value":"--kubelet-insecure-tls"},{"op":"add","path":"/spec/template/spec/hostNetwork","value":true}]'
+  1) 使用官方镜像地址直接安装
+  curl -sL https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml \
+    | sed -e "s|\(\s\+\)- args:|\1- args:\n\1  - --kubelet-insecure-tls|" | kubectl apply -f -
+  
+  2) 使用自定义镜像地址安装
+  curl -sL https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml \
+    | sed \
+      -e "s|\(\s\+\)- args:|\1- args:\n\1  - --kubelet-insecure-tls|" \
+      -e "s|registry.k8s.io/metrics-server|registry.cn-hangzhou.aliyuncs.com/google_containers|g" \
+    | kubectl apply -f -
+  
+  3) 手动（hostNetwork: true）
+  wget https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+  kubectl apply -f component.yaml
+  kubectl get deployments metrics-server -n kube-system
+  kubectl patch deploy metrics-server -n kube-system --type='json' -p='[{"op":"add","path":"/spec/template/spec/containers/0/args/-","value":"--kubelet-insecure-tls"},{"op":"add","path":"/spec/template/spec/hostNetwork","value":true}]'
 
 
 2. 验证
@@ -221,11 +221,6 @@ kubeadm join 192.168.64.55:6443 --token pitfej.61efpxyer26iv7zo \
 multipass shell master
 
 /--------------------------  因为cloudcore没有污点容忍，确保master节点已经去掉污点  -------------------------------------\
-
-wget https://github.com/kubeedge/kubeedge/releases/download/v1.13.0/keadm-v1.13.0-linux-arm64.tar.gz
-tar xzvf keadm-v1.13.0-linux-arm64.tar.gz && cp keadm-v1.13.0-linux-arm64/keadm/keadm /usr/sbin/
-keadm init --advertise-address=192.168.64.56 --kube-config=$HOME/.kube/config --kubeedge-version=1.13.0
-
 // 边缘节点上不执行kube-proxy
 kubectl edit daemonsets.apps -n kube-system kube-proxy
 
@@ -242,6 +237,13 @@ affinity:
 kubectl patch daemonset kube-proxy -n kube-system -p '{"spec": {"template": {"spec": {"affinity": {"nodeAffinity": {"requiredDuringSchedulingIgnoredDuringExecution": {"nodeSelectorTerms": [{"matchExpressions": [{"key": "node-role.kubernetes.io/edge", "operator": "DoesNotExist"}]}]}}}}}}}'
 
 
+// install kubeedge
+wget https://github.com/kubeedge/kubeedge/releases/download/v1.13.0/keadm-v1.13.0-linux-arm64.tar.gz
+tar xzvf keadm-v1.13.0-linux-arm64.tar.gz && cp keadm-v1.13.0-linux-arm64/keadm/keadm /usr/sbin/
+
+// keadm init --advertise-address=192.168.64.56 --kube-config=$HOME/.kube/config --kubeedge-version=v1.13.0 --image-repository registry.aliyuncs.com/google_containers
+keadm init --advertise-address=192.168.60.56 --kube-config=$HOME/.kube/config  --profile version=v1.13.0 --image-repository registry.aliyuncs.com/google_containers --set iptablesManager.mode="external"
+
 // 打开转发路由
 export CLOUDCOREIPS="192.168.64.56"
 iptables -t nat -A OUTPUT -p tcp --dport 10350 -j DNAT --to $CLOUDCOREIPS:10003
@@ -254,7 +256,10 @@ netstat -nltp | grep cloudcore
 pkill cloudcore
 ```
 
-注： 如果因为网络原因导致初始化失败，则可以提前把相关文件下载到/etc/kubeedge/
+注： 
+
+如果因为网络原因导致初始化失败，则可以提前把相关文件下载到/etc/kubeedge/
+- cloudStream 在 v1.30.0 中云端已默认开启，无需手动开启
 - kubeedge-v1.13.0-linux-arm64.tar.gz(https://github.com/kubeedge/kubeedge/releases/download/v1.13.0/kubeedge-v1.13.0-linux-arm64.tar.gz)
 - cloudcore.service(https://raw.githubusercontent.com/kubeedge/kubeedge/master/build/tools/cloudcore.service)
 - weave 网络插件问题：https://github.com/kubeedge/kubeedge/issues/4161
@@ -263,17 +268,12 @@ pkill cloudcore
 
 ```
 multipass shell e-node
-------------------------  可选操作  ------------------------------
-设置密码: sudo passwd ubuntu
-ssh 开启用户名密码登录
-vi /etc/ssh/sshd_config
-PermitRootLogin yes
-    PasswordAuthentication yes
-------------------------------------------------------------------
-
 git clone https://github.com/robertzhouxh/multipass-k8s-kubeedge
 cd edge-node
 ./docker.sh
+
+sudo echo "net.ipv4.ip_forward = 1" >> /etc/sysctl.conf
+sudo sysctl -p | grep ip_forward
 
 wget https://github.com/kubeedge/kubeedge/releases/download/v1.13.0/keadm-v1.13.0-linux-arm64.tar.gz
 tar xzvf keadm-v1.13.0-linux-arm64.tar.gz && cp keadm-v1.13.0-linux-arm64/keadm/keadm /usr/sbin/
@@ -281,7 +281,7 @@ tar xzvf keadm-v1.13.0-linux-arm64.tar.gz && cp keadm-v1.13.0-linux-arm64/keadm/
 keadm join --cloudcore-ipport=192.168.64.56:10000 --kubeedge-version=1.13.0 --token=$(keadm gettoken)  --edgenode-name=e-node --runtimetype=docker --remote-runtime-endpoint unix:///run/containerd/containerd.sock
 
 eg:
-keadm join --cloudcore-ipport=192.168.64.56:10000 --kubeedge-version=1.13.0 --token=49f7671edd89e624056f0b661e07e7cb57c2ca0eb51b4568a8dd19bdc8d2963a.eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE2ODYyOTgxMjl9.y7Cr4WIoC8NLrUDBpOG7lTK8PtvaWcoOaryCk0qyNCg --edgenode-name=e-node --runtimetype=docker --remote-runtime-endpoint unix:///run/containerd/containerd.sock
+keadm join --cloudcore-ipport=192.168.64.56:10000 --kubeedge-version=1.13.0 --token=5d3c7f90452a5aa8585d21baf7a6d5ad7f98c529026afae9960656173dcfefac.eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE2ODYzNTk5NTl9.kJEWDd-2bX0Fh3CChhjZNkOnPMt5z9lbSnU_GPKo5Xs --edgenode-name=edge-node --runtimetype=docker --remote-runtime-endpoint unix:///run/containerd/containerd.sock
 
 // reboot edgecore
 systemctl restart edgecore.service
