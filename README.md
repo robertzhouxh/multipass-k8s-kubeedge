@@ -287,7 +287,7 @@ keadm join --cloudcore-ipport=192.168.64.56:10000 --kubeedge-version=1.13.0 --to
 eg:
 docker pull Pulling kubeedge/installation-package:v1.13.0
 
-keadm join --cloudcore-ipport=192.168.64.56:10000 --kubeedge-version=1.13.0 --token=ae7a08f198daa5c76f54a1edc7ad06395ff2a76b68a4be931dd1f6d8e8d30a74.eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE2ODYzNjY2Mzh9.JoYnqxD62WFhSJeFT-4ct0bwbpNbTbM4aNd3tl6G3BQ --edgenode-name=e-node --runtimetype=docker --remote-runtime-endpoint unix:///run/containerd/containerd.sock
+keadm join --cloudcore-ipport=192.168.64.56:10000 --kubeedge-version=1.13.0 --token=ae7a08f198daa5c76f54a1edc7ad06395ff2a76b68a4be931dd1f6d8e8d30a74.eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE2ODYzNjY2Mzh9.JoYnqxD62WFhSJeFT-4ct0bwbpNbTbM4aNd3tl6G3BQ --edgenode-name=edge-node --runtimetype=docker --remote-runtime-endpoint unix:///run/containerd/containerd.sock
 
 // reboot edgecore
 systemctl restart edgecore.service
