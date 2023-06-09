@@ -478,11 +478,42 @@ options ndots:5
     生成永久token: kubeadm token create --ttl 0
 
     测试 coredns： 
-    kubectl run busybox --image busybox:1.28 -restart=Never --rm -it busybox -- sh nslookup my-web.default.sc.cluster.local
 
-    kubectl get pods -o wide -n kube-system
-    kubectl get pod podName  -o yaml | grep phase
-    kubectl describe pod PodName -n kube-system
+
+kubectl exec -it podName  -c  containerName -n namespace -- shell comand
+kubectl run busybox --image busybox -restart=Never --rm -it busybox -- sh nslookup my-web.default.sc.cluster.local
+
+kubectl get node --show-labels
+kubectl label nodes nodeName LabelKey=LabelValue
+kubectl label nodes nodeName Labelkey-
+
+eg
+kubectl label nodes e-node node-meta.kubernetes.io/insid=ironman
+kubectl label nodes e-node node-meta.kubernetes.io-
+
+
+kubectl apply -f - <<EOF
+apiVersion: v1
+kind: Pod
+metadata:
+  name: busybox-sleep
+spec:
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: node-meta.kubernetes.io/insid
+            operator: In
+            values:
+            - ironman
+  containers:
+  - name: busybox
+    image: busybox:1.36
+    args:
+    - sleep
+    - "1000000"
+EOF
 
 ```
 ## 边缘问题
