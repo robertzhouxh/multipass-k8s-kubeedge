@@ -268,7 +268,7 @@ pkill cloudcore
 - cloudcore.service(https://raw.githubusercontent.com/kubeedge/kubeedge/master/build/tools/cloudcore.service)
 - weave 网络插件问题：https://github.com/kubeedge/kubeedge/issues/4161
 
-## 边端-Worker节点 Join
+## 边端-Worker节点（卸载记得master节点上 kubectl delete node e-node）
 
 ```
 multipass shell e-node
