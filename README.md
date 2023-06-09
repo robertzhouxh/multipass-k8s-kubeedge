@@ -241,8 +241,12 @@ kubectl patch daemonset kube-proxy -n kube-system -p '{"spec": {"template": {"sp
 wget https://github.com/kubeedge/kubeedge/releases/download/v1.13.0/keadm-v1.13.0-linux-arm64.tar.gz
 tar xzvf keadm-v1.13.0-linux-arm64.tar.gz && cp keadm-v1.13.0-linux-arm64/keadm/keadm /usr/sbin/
 
-// keadm init --advertise-address=192.168.64.56 --kube-config=$HOME/.kube/config --kubeedge-version=v1.13.0 --image-repository registry.aliyuncs.com/google_containers
-keadm init --advertise-address=192.168.60.56 --kube-config=$HOME/.kube/config  --profile version=v1.13.0 --image-repository registry.aliyuncs.com/google_containers --set iptablesManager.mode="external"
+// iptablesmanager:v1.13.0 镜像版本错误： https://github.com/kubeedge/kubeedge/pull/4620
+docker pull kubeedge/kubeedge/cloudcore:v1.13.0
+docker pull kubeedge/iptablesmanager:v1.13.0
+docker tag kubeedge/iptablesmanager:v1.13.0 kubeedge/iptables-manager:v1.13.0
+
+keadm init --advertise-address=192.168.64.56 --kube-config=$HOME/.kube/config  --profile version=v1.13.0 --set iptablesManager.mode="external"
 
 // 打开转发路由
 export CLOUDCOREIPS="192.168.64.56"
@@ -281,7 +285,9 @@ tar xzvf keadm-v1.13.0-linux-arm64.tar.gz && cp keadm-v1.13.0-linux-arm64/keadm/
 keadm join --cloudcore-ipport=192.168.64.56:10000 --kubeedge-version=1.13.0 --token=$(keadm gettoken)  --edgenode-name=e-node --runtimetype=docker --remote-runtime-endpoint unix:///run/containerd/containerd.sock
 
 eg:
-keadm join --cloudcore-ipport=192.168.64.56:10000 --kubeedge-version=1.13.0 --token=5d3c7f90452a5aa8585d21baf7a6d5ad7f98c529026afae9960656173dcfefac.eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE2ODYzNTk5NTl9.kJEWDd-2bX0Fh3CChhjZNkOnPMt5z9lbSnU_GPKo5Xs --edgenode-name=edge-node --runtimetype=docker --remote-runtime-endpoint unix:///run/containerd/containerd.sock
+docker pull Pulling kubeedge/installation-package:v1.13.0
+
+keadm join --cloudcore-ipport=192.168.64.56:10000 --kubeedge-version=1.13.0 --token=ae7a08f198daa5c76f54a1edc7ad06395ff2a76b68a4be931dd1f6d8e8d30a74.eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE2ODYzNjY2Mzh9.JoYnqxD62WFhSJeFT-4ct0bwbpNbTbM4aNd3tl6G3BQ --edgenode-name=e-node --runtimetype=docker --remote-runtime-endpoint unix:///run/containerd/containerd.sock
 
 // reboot edgecore
 systemctl restart edgecore.service
