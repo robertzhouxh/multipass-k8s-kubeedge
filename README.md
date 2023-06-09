@@ -30,21 +30,17 @@ kubeadm join 192.168.64.56:6443 --token y2mayd.pqd1cia9o8as336t \
 ```
 --------------------------------------------------------------------------------------
 1. install flannel
-参考： 不建议把 flannel pod 调度到边缘节点
+参考： 不建议把 flannel pod 调度到边缘节点 disable flannel in edge node, because it connect to kube-apiserver directly.
+
 //https://github.com/kubeedge/kubeedge/issues/2677
 //https://github.com/kubeedge/kubeedge/issues/4521
 //https://docs.openeuler.org/zh/docs/22.09/docs/KubeEdge/KubeEdge%E9%83%A8%E7%BD%B2%E6%8C%87%E5%8D%97.html
-
 wget https://github.com/containernetworking/plugins/releases/download/v1.3.0/cni-plugins-linux-arm64-v1.3.0.tgz
 mkdir -p /opt/cni/bin
 tar xf cni-plugins-linux-arm64-v1.3.0.tgz -C /opt/cni/bin
 wget https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml
-kubectl apply -f kube-flannel.yml
 
-
-或者：
-// disable flannel in edge node, because it connect to kube-apiserver directly.
-kubectl edit ds -n kube-system kube-flannel-ds
+vim kube-flannel.yml
 ...
 spec:
   ...
@@ -63,20 +59,10 @@ spec:
 +             - key: node-role.kubernetes.io/agent
 +               operator: DoesNotExist
 
+kubectl apply -f kube-flannel.yml
+
 // 验证
 kubectl get pods -n kube-flannel
-
-kc edit cm -n kube-system kube-proxy
- ...
- kubeconfig.conf: |-
-   apiVersion: v1
-   kind: Config
-   clusters:
-   - cluster:
-       certificate-authority: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
-       server: http://127.0.0.1:10550
-     name: default
- ...
 
 // 卸载
 kubectl delete -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml
@@ -90,6 +76,7 @@ rm -rf /var/lib/cni/
 rm -f /etc/cni/net.d/*
 
 注：执行完上面的操作，重启kubelet
+systemctl restart kubelet
 
 --------------------------------------------------------------------------------------
 2. install weave
@@ -223,7 +210,9 @@ docker pull kubeedge/kubeedge/cloudcore:v1.13.0
 docker pull kubeedge/iptablesmanager:v1.13.0
 docker tag kubeedge/iptablesmanager:v1.13.0 kubeedge/iptables-manager:v1.13.0
 
-keadm init --advertise-address=192.168.64.56 --kube-config=$HOME/.kube/config  --profile version=v1.13.0 --set iptablesManager.mode="external"
+//keadm init --advertise-address=192.168.64.56 --kube-config=$HOME/.kube/config  --profile version=v1.13.0 --set iptablesManager.mode="external"
+keadm init --advertise-address=192.168.64.56 --kube-config=$HOME/.kube/config  --profile version=v1.13.0
+
 
 // 打开转发路由
 export CLOUDCOREIPS="192.168.64.56"
@@ -249,12 +238,13 @@ pkill cloudcore
 
 ```
 multipass shell e-node
-git clone https://github.com/robertzhouxh/multipass-k8s-kubeedge
-cd edge-node
-./docker.sh
 
 sudo echo "net.ipv4.ip_forward = 1" >> /etc/sysctl.conf
 sudo sysctl -p | grep ip_forward
+
+git clone https://github.com/robertzhouxh/multipass-k8s-kubeedge
+cd edge-node
+./docker.sh
 
 wget https://github.com/kubeedge/kubeedge/releases/download/v1.13.0/keadm-v1.13.0-linux-arm64.tar.gz
 tar xzvf keadm-v1.13.0-linux-arm64.tar.gz && cp keadm-v1.13.0-linux-arm64/keadm/keadm /usr/sbin/
@@ -266,10 +256,10 @@ docker pull eclipse-mosquitto:1.6.15
 docker pull kubeedge/installation-package:v1.13.0
 docker pull kubeedge/pause:3.6 
 
-keadm join --cloudcore-ipport=192.168.64.56:10000 --kubeedge-version=1.13.0 --token= --edgenode-name=edge-node --runtimetype=docker --remote-runtime-endpoint unix:///run/containerd/containerd.sock
+keadm join --cloudcore-ipport=192.168.64.56:10000 --kubeedge-version=1.13.0 --token=fd18f2a8b740c217a3f0beb79f01bdadd39c696a9cb821ab419b3ebc7c206245.eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE2ODYzNzgxODZ9.UhU1pMkvXGCF77z5R55GwnMNKTbtucsa157ri7U7R_4 --edgenode-name=e-node --runtimetype=docker --remote-runtime-endpoint unix:///run/containerd/containerd.sock
 
 
-keadm join --cloudcore-ipport=192.168.64.56:10000 --kubeedge-version=1.13.0 --token=cfced7937846764a14793faa48b20e32ed6244042df17ad696a876e1c1b96ae9.eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE2ODYzNzI4MzF9.jhW8ZWhMlQFmQ4qEvE8H3-QNbwY-G5PdBbJcUdzqGWU --edgenode-name=edge-worker --runtimetype=docker --remote-runtime-endpoint unix:///run/containerd/containerd.sock
+keadm join --cloudcore-ipport=192.168.64.56:10000 --kubeedge-version=1.13.0 --token=cfced7937846764a14793faa48b20e32ed6244042df17ad696a876e1c1b96ae9.eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE2ODYzNzI4MzF9.jhW8ZWhMlQFmQ4qEvE8H3-QNbwY-G5PdBbJcUdzqGWU --edgenode-name=e-worker --runtimetype=docker --remote-runtime-endpoint unix:///run/containerd/containerd.sock
 
 
 // reboot edgecore
@@ -281,8 +271,9 @@ journalctl -u edgecore.service -f
 注：
 1) 如果要使用containerd, 则要打开 cri，参考 https://github.com/kubeedge/kubeedge/issues/4621
 2) 边缘节点开启 edgeStream, 支持 metrics-server 获取子节点 cpu, mem 
-- 编辑 /etc/kubeedge/config/edgecore.yaml 文件 edgeStream字段值改为 enable: true
-- 重启 edgecore 服务，systemctl restart edgecore.service
+- vi /etc/kubeedge/config/edgecore.yaml 
+  - edgeStream enable: false->true
+- systemctl restart edgecore.service
 
 ### 卸载EdgeCore
 
