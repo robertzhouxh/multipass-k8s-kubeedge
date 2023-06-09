@@ -22,8 +22,8 @@ cd multipass-k8s-kubeedge/master-node
 ./install-all
 
 // 记录
-kubeadm join 192.168.64.56:6443 --token g16jp0.4i98besn5hj9a5iv \
-	--discovery-token-ca-cert-hash sha256:1781e235db319c8f7b490b4ad3038b4765135d854b4ba4d72d3faa6348f84f54
+kubeadm join 192.168.64.56:6443 --token fom9b3.i7qibq9xj5wh1if3 \
+	--discovery-token-ca-cert-hash sha256:9234663bca7a48fca4a317a19e5d2daf2d309b9fbb229c070bfdc718d6e310ea
 ```
 
 ### 网络插件(建议安装 flannel)

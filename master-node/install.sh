@@ -29,7 +29,7 @@ sudo apt-get update
 # apt-cache madison kubeadm
 #sudo apt-get install -y kubelet=1.20.0-00 kubeadm=1.20.0-00 kubectl=1.20.0-00
 #sudo apt-get install -y kubelet=1.23.4-00 kubeadm=1.23.4-00 kubectl=1.23.4-00
-sudo apt-get install -y kubelet=1.23.17-00 kubeadm=1.23.17-00 kubectl=1.23.17-00
+sudo apt-get install -y kubelet=1.23.15-00 kubeadm=1.23.15-00 kubectl=1.23.15-00
 
 
 sudo apt-mark hold kubelet kubeadm kubectl
@@ -48,7 +48,7 @@ kubeadm init \
   --image-repository registry.aliyuncs.com/google_containers \
   --service-cidr=10.96.0.0/12 \
   --pod-network-cidr=10.244.0.0/16 \
-  --kubernetes-version v1.23.17
+  --kubernetes-version v1.23.15
 
 mkdir -p $HOME/.kube
 sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
