@@ -22,8 +22,8 @@ cd multipass-k8s-kubeedge/master-node
 ./install-all
 
 // 记录
-kubeadm join 192.168.64.56:6443 --token wiquji.6obld42hwg4gojiz \
-	--discovery-token-ca-cert-hash sha256:8ee201ca1f81d0907006602f59854ca94588d5cd5dab1c6dedfd033b91dadb7d 
+kubeadm join 192.168.64.56:6443 --token g16jp0.4i98besn5hj9a5iv \
+	--discovery-token-ca-cert-hash sha256:1781e235db319c8f7b490b4ad3038b4765135d854b4ba4d72d3faa6348f84f54
 ```
 
 ### 网络插件(建议安装 flannel)
@@ -138,7 +138,7 @@ kubectl taint node master node-role.kubernetes.io/master-
 kubectl taint nodes --all node-role.kubernetes.io/master-
 
 ```
-### metrics-server( 必须在Master节点 )
+## Step3.Master节点安装 metrics-server
 ```
 1. 安装
 
@@ -168,10 +168,18 @@ kubectl top pods -n kube-system
 kubectl delete -f components.yaml
 
 ```
+## Step4.Worker节点 Join
+```
+multipass shell e-worker
 
+git clone https://github.com/robertzhouxh/multipass-k8s-kubeedge
+cd multipass-k8s-kubeedge/worker-node
+./install-all.sh
 
-
-### 重置K8S
+kubeadm join 192.168.64.55:6443 --token pitfej.61efpxyer26iv7zo \
+	--discovery-token-ca-cert-hash sha256:978db90c12ee512df0d6f4bbb83bb78cab97abd6ae52a760343cf793bd87ec77 
+```
+## 重置K8S
 ```
 swapoff -a
 kubeadm reset
@@ -183,37 +191,6 @@ rm -f /etc/kubernetes/kubelet.conf
 rm -f /etc/kubernetes/pki/ca.crt 
 
 iptables -F && iptables -t nat -F && iptables -t mangle -F && iptables -X
-```
-## Step3.可视化管理
-```
-sudo docker run -d \
-  --restart=unless-stopped \
-  --name=kuboard \
-  -p 9090:80/tcp \
-  -p 10081:10081/tcp \
-  -e KUBOARD_ENDPOINT="http://192.168.64.56:80" \
-  -e KUBOARD_AGENT_SERVER_TCP_PORT="10081" \
-  -v /root/kuboard-data:/data \
-  swr.cn-east-2.myhuaweicloud.com/kuboard/kuboard:v3
-
-http://192.168.64.56:9090
-用户名： admin
-密码： Kuboard123
-```
-
-Tricks: 
-mac: cat ~/.kube/config | pbcopy
-
-## Step4.Worker节点 Join
-```
-multipass shell e-worker
-
-git clone https://github.com/robertzhouxh/multipass-k8s-kubeedge
-cd multipass-k8s-kubeedge/worker-node
-./install-all.sh
-
-kubeadm join 192.168.64.55:6443 --token pitfej.61efpxyer26iv7zo \
-	--discovery-token-ca-cert-hash sha256:978db90c12ee512df0d6f4bbb83bb78cab97abd6ae52a760343cf793bd87ec77 
 ```
 # kubeedge 部署
 ## 云端-Master节点
@@ -282,12 +259,18 @@ sudo sysctl -p | grep ip_forward
 wget https://github.com/kubeedge/kubeedge/releases/download/v1.13.0/keadm-v1.13.0-linux-arm64.tar.gz
 tar xzvf keadm-v1.13.0-linux-arm64.tar.gz && cp keadm-v1.13.0-linux-arm64/keadm/keadm /usr/sbin/
 
-keadm join --cloudcore-ipport=192.168.64.56:10000 --kubeedge-version=1.13.0 --token=$(keadm gettoken)  --edgenode-name=e-node --runtimetype=docker --remote-runtime-endpoint unix:///run/containerd/containerd.sock
+keadm join --cloudcore-ipport=192.168.64.56:10000 --kubeedge-version=1.13.0 --token=$(keadm gettoken)  --edgenode-name=edge-node --runtimetype=docker --remote-runtime-endpoint unix:///run/containerd/containerd.sock
 
 eg:
-docker pull Pulling kubeedge/installation-package:v1.13.0
+docker pull eclipse-mosquitto:1.6.15
+docker pull kubeedge/installation-package:v1.13.0
+docker pull kubeedge/pause:3.6 
 
-keadm join --cloudcore-ipport=192.168.64.56:10000 --kubeedge-version=1.13.0 --token=ae7a08f198daa5c76f54a1edc7ad06395ff2a76b68a4be931dd1f6d8e8d30a74.eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE2ODYzNjY2Mzh9.JoYnqxD62WFhSJeFT-4ct0bwbpNbTbM4aNd3tl6G3BQ --edgenode-name=edge-node --runtimetype=docker --remote-runtime-endpoint unix:///run/containerd/containerd.sock
+keadm join --cloudcore-ipport=192.168.64.56:10000 --kubeedge-version=1.13.0 --token= --edgenode-name=edge-node --runtimetype=docker --remote-runtime-endpoint unix:///run/containerd/containerd.sock
+
+
+keadm join --cloudcore-ipport=192.168.64.56:10000 --kubeedge-version=1.13.0 --token=cfced7937846764a14793faa48b20e32ed6244042df17ad696a876e1c1b96ae9.eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE2ODYzNzI4MzF9.jhW8ZWhMlQFmQ4qEvE8H3-QNbwY-G5PdBbJcUdzqGWU --edgenode-name=edge-worker --runtimetype=docker --remote-runtime-endpoint unix:///run/containerd/containerd.sock
+
 
 // reboot edgecore
 systemctl restart edgecore.service
@@ -389,7 +372,26 @@ kubectl apply -f build/agent/resources/
 kubectl get all -n kubeedge -o wide
 ```
 
-# kuboard 操作
+# 可视化管理kuboard 
+```
+sudo docker run -d \
+  --restart=unless-stopped \
+  --name=kuboard \
+  -p 9090:80/tcp \
+  -p 10081:10081/tcp \
+  -e KUBOARD_ENDPOINT="http://192.168.64.56:80" \
+  -e KUBOARD_AGENT_SERVER_TCP_PORT="10081" \
+  -v /root/kuboard-data:/data \
+  swr.cn-east-2.myhuaweicloud.com/kuboard/kuboard:v3
+
+http://192.168.64.56:9090
+用户名： admin
+密码： Kuboard123
+```
+
+Tricks: 
+mac: cat ~/.kube/config | pbcopy
+
 ## master 节点操作
 ```
 1. 操作镜像
