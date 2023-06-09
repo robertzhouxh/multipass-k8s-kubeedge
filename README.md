@@ -485,7 +485,7 @@ kubectl run busybox --image busybox -restart=Never --rm -it busybox -- sh nslook
 
 kubectl get node --show-labels
 kubectl label nodes nodeName LabelKey=LabelValue
-kubectl label nodes nodeName Labelkey-
+kbectl label nodes nodeName Labelkey-
 
 eg
 kubectl label nodes e-node node-meta.kubernetes.io/insid=ironman
@@ -516,6 +516,9 @@ spec:
 EOF
 
 ```
+kubectl get pod busybox-sleep
+kubectl exec --stdin --tty busybox-sleep -- /bin/sh
+
 ## 边缘问题
 ``` 
     https://github.com/kubeedge/kubeedge/issues/4691
