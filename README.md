@@ -206,7 +206,7 @@ wget https://github.com/kubeedge/kubeedge/releases/download/v1.13.0/keadm-v1.13.
 tar xzvf keadm-v1.13.0-linux-arm64.tar.gz && cp keadm-v1.13.0-linux-arm64/keadm/keadm /usr/sbin/
 
 // iptablesmanager:v1.13.0 镜像版本错误： https://github.com/kubeedge/kubeedge/pull/4620
-docker pull kubeedge/kubeedge/cloudcore:v1.13.0
+docker pull kubeedge/cloudcore:v1.13.0
 docker pull kubeedge/iptablesmanager:v1.13.0
 docker tag kubeedge/iptablesmanager:v1.13.0 kubeedge/iptables-manager:v1.13.0
 
