@@ -363,7 +363,7 @@ kubectl apply -f build/agent/resources/
 kubectl get all -n kubeedge -o wide
 ```
 
-# 可视化管理kuboard 
+# 可视化管理 
 ```
 sudo docker run -d \
   --restart=unless-stopped \
@@ -467,33 +467,26 @@ options ndots:5
 ```
 
 # 定位问题
+## Master
 
 ```
-    // on master:
-    查看k8s 运行日志命令, 这个比较有用，在k8s 启动、kubeadm init、kubeadm join 阶段可以辅助分析问题。 journalctl -xefu kubelet 
-    查看驱动： systemctl show --property=Environment kubelet |cat
-    重启:     systemctl restart kubelet
-    启动:     systemctl start kubelet
-    停止:     systemctl stop kubelet
+    kubeadm init、kubeadm join 阶段可以辅助分析问题: journalctl -xefu kubelet 
+    systemctl restart/start/stop kubelet
     开机自启:  systemctl enable kubelet
-
     dashboard 获取token: kubectl describe secret admin-user -n kubernetes-dashboard
-    kubeadm 重置， kubeadm init 命令报错，修复问题后需要重新进行 init 操作： kubeadm reset
-
     查看存在token: kubeadm token list
     生成永久token: kubeadm token create --ttl 0
-    测试 coredns： kubectl run busybox --image busybox: 1.28 -restart=Never --rm -it busybox -- sh
-nslookup my-web.default.sc.cluster.local
 
-
+    测试 coredns： 
+    kubectl run busybox --image busybox:1.28 -restart=Never --rm -it busybox -- sh nslookup my-web.default.sc.cluster.local
 
     kubectl get pods -o wide -n kube-system
     kubectl get pod podName  -o yaml | grep phase
     kubectl describe pod PodName -n kube-system
 
-    // on edge
-    flannel 错误
-
+```
+## 边缘问题
+``` 
     https://github.com/kubeedge/kubeedge/issues/4691
     TOKEN=`kubectl get secret -nkubeedge tokensecret -o=jsonpath='{.data.tokendata}' | base64 -d`
     keadm join \
@@ -504,14 +497,10 @@ nslookup my-web.default.sc.cluster.local
     --runtimetype=docker \
     --remote-runtime-endpoint="unix:///var/run/cri-dockerd.sock"
 
+    systemctl status edgecore.service
+    systemctl restart edgecore.service
+    journalctl -u edgecore.service -f
+    journalctl -u edgecore.service -xe
 
-systemctl status edgecore.service
-systemctl restart edgecore.service
-journalctl -u edgecore.service -f
-journalctl -u edgecore.service -xe
-    
-# restart edgecore
-pkill edgecore
-systemctl restart edgecore
 ```
 
