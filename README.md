@@ -20,10 +20,6 @@ sudo -i
 git clone https://github.com/robertzhouxh/multipass-k8s-kubeedge
 cd multipass-k8s-kubeedge/master-node
 ./install-all
-
-// 记录
-kubeadm join 192.168.64.56:6443 --token y2mayd.pqd1cia9o8as336t \
-	--discovery-token-ca-cert-hash sha256:2645e6fd8b3d3de42e96dd12dc0d232f3a74527b4c73c35c7311d3dea83c2f22 
 ```
 
 ### 网络插件(建议安装 flannel)
@@ -159,13 +155,15 @@ kubectl delete -f components.yaml
 ## Step3.[可选]k8s节点join
 ```
 multipass shell e-worker
-
 git clone https://github.com/robertzhouxh/multipass-k8s-kubeedge
 cd multipass-k8s-kubeedge/k8s-node
 ./install-all.sh
 
-kubeadm join 192.168.64.55:6443 --token pitfej.61efpxyer26iv7zo \
-	--discovery-token-ca-cert-hash sha256:978db90c12ee512df0d6f4bbb83bb78cab97abd6ae52a760343cf793bd87ec77 
+//on master node:
+kubeadm token create
+openssl x509 -pubkey -in /etc/kubernetes/pki/ca.crt | openssl rsa -pubin -outform der 2>/dev/null | openssl dgst -sha256 -hex | sed 's/^ .* //'
+
+kubeadm join 192.168.64.64:6443 --token zarmgo.vnwbnnh92un15qsj --discovery-token-ca-cert-hash sha256:30357707e093c2f74e9563d50dfb7b8c584d6983b775b5afe82684739a4a0f50
 ```
 ## 重置K8S
 ```
@@ -225,7 +223,11 @@ netstat -nltp | grep cloudcore
 
 // 重启 cloudcore
 pkill cloudcore
+
+// logs
+kubectl logs -f  cloudcore-54b85b8757-hvt4n -n kubeedge
 ```
+
 
 注： 
 
@@ -257,11 +259,7 @@ docker pull eclipse-mosquitto:1.6.15
 docker pull kubeedge/installation-package:v1.13.0
 docker pull kubeedge/pause:3.6 
 
-keadm join --cloudcore-ipport=192.168.64.64:10000 --kubeedge-version=1.13.0 --token=1ad7c7e16b0ee2ff78811fb0656a797197e11972678f95bfb6bce7a02d696937.eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE2ODY0NTIwMjB9.WkMmf6PYt82czyrALQOir6dPhHCI0-EYC5QyL6rrNc8 --edgenode-name=mec-node --runtimetype=docker --remote-runtime-endpoint unix:///run/containerd/containerd.sock
-
-
-keadm join --cloudcore-ipport=192.168.64.64:10000 --kubeedge-version=1.13.0 --token=cfced7937846764a14793faa48b20e32ed6244042df17ad696a876e1c1b96ae9.eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE2ODYzNzI4MzF9.jhW8ZWhMlQFmQ4qEvE8H3-QNbwY-G5PdBbJcUdzqGWU --edgenode-name=k8s-node --runtimetype=docker --remote-runtime-endpoint unix:///run/containerd/containerd.sock
-
+keadm join --cloudcore-ipport=192.168.64.64:10000 --kubeedge-version=1.13.0 --token=90f670cea3f1ce2311c79144840bceebc167d832549200c6ea51d899f7112e44.eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE2ODY0NTc4ODd9.aTmHkM1Ubov2NGPTH_J-QhoL8e68NkzL59ENOUN2GfI --edgenode-name=mec-node --runtimetype=docker --remote-runtime-endpoint unix:///run/containerd/containerd.sock
 
 // reboot edgecore
 systemctl restart edgecore.service
