@@ -369,12 +369,12 @@ sudo docker run -d \
   --name=kuboard \
   -p 9090:80/tcp \
   -p 10081:10081/tcp \
-  -e KUBOARD_ENDPOINT="http://192.168.64.56:80" \
+  -e KUBOARD_ENDPOINT="http://192.168.64.64:80" \
   -e KUBOARD_AGENT_SERVER_TCP_PORT="10081" \
   -v /root/kuboard-data:/data \
   swr.cn-east-2.myhuaweicloud.com/kuboard/kuboard:v3
 
-http://192.168.64.56:9090
+http://192.168.64.64:9090
 用户名： admin
 密码： Kuboard123
 ```
