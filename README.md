@@ -125,7 +125,7 @@ kubectl taint node master node-role.kubernetes.io/master-
 kubectl taint nodes --all node-role.kubernetes.io/master-
 
 ```
-## Step3.Master节点安装 metrics-server
+### 安装 metrics-server
 ```
 1. 安装
 
@@ -156,7 +156,7 @@ kubectl top pods -n kube-system
 kubectl delete -f components.yaml
 
 ```
-## Step4.[可选]k8s节点join
+## Step3.[可选]k8s节点join
 ```
 multipass shell e-worker
 
