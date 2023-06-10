@@ -156,7 +156,7 @@ kubectl top pods -n kube-system
 kubectl delete -f components.yaml
 
 ```
-## Step4.Worker节点 Join
+## Step4.[可选]k8s节点join
 ```
 multipass shell e-worker
 
