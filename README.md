@@ -140,12 +140,13 @@ kubectl taint nodes --all node-role.kubernetes.io/master-
       -e "s|registry.k8s.io/metrics-server|registry.cn-hangzhou.aliyuncs.com/google_containers|g" \
     | kubectl apply -f -
   
-  3) 手动（hostNetwork: true）
+  3) 手动（hostNetwork: true） 设置 hostNetwork=true 参考：https://support.huaweicloud.com/usermanual-cce/cce_10_0402.html
+  // Kubernetes支持Pod直接使用主机（节点）的网络，当Pod配置为hostNetwork: true时，在此Pod中运行的应用程序可以直接看到Pod所在主机的网络接口。
+  // 由于使用主机网络，访问Pod就是访问节点，要注意放通节点安全组端口，否则会出现访问不通的情况。
   wget https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
-  kubectl apply -f component.yaml
+  kubectl apply -f components.yaml
   kubectl get deployments metrics-server -n kube-system
-  kubectl patch deploy metrics-server -n kube-system --type='json' -p='[{"op":"add","path":"/spec/template/spec/containers/0/args/-","value":"--kubelet-insecure-tls"},{"op":"add","path":"/spec/template/spec/hostNetwork","value":true}]'
-
+  kubectl patch deploy metrics-server -n kube-system --type='json' -p='[{"op":"add","path":"/spec/template/spec/containers/0/args/-","value":"--kubelet-insecure-tls"},{"op":"add","path":"/spec/template/spec/ostNetwork","value":true}]'
 
 2. 验证
 kubectl top nodes
@@ -160,7 +161,7 @@ kubectl delete -f components.yaml
 multipass shell e-worker
 
 git clone https://github.com/robertzhouxh/multipass-k8s-kubeedge
-cd multipass-k8s-kubeedge/worker-node
+cd multipass-k8s-kubeedge/k8s-node
 ./install-all.sh
 
 kubeadm join 192.168.64.55:6443 --token pitfej.61efpxyer26iv7zo \
@@ -180,7 +181,7 @@ rm -f /etc/kubernetes/pki/ca.crt
 iptables -F && iptables -t nat -F && iptables -t mangle -F && iptables -X
 ```
 # kubeedge 部署
-## 云端-Master节点
+## 云端节点
 ```
 multipass shell master
 
@@ -211,11 +212,11 @@ docker pull kubeedge/iptablesmanager:v1.13.0
 docker tag kubeedge/iptablesmanager:v1.13.0 kubeedge/iptables-manager:v1.13.0
 
 //keadm init --advertise-address=192.168.64.56 --kube-config=$HOME/.kube/config  --profile version=v1.13.0 --set iptablesManager.mode="external"
-keadm init --advertise-address=192.168.64.56 --kube-config=$HOME/.kube/config  --profile version=v1.13.0
+keadm init --advertise-address=192.168.64.64 --kube-config=$HOME/.kube/config  --profile version=v1.13.0
 
 
 // 打开转发路由
-export CLOUDCOREIPS="192.168.64.56"
+export CLOUDCOREIPS="192.168.64.64"
 iptables -t nat -A OUTPUT -p tcp --dport 10350 -j DNAT --to $CLOUDCOREIPS:10003
 iptables -t nat -A OUTPUT -p tcp --dport 10351 -j DNAT --to $CLOUDCOREIPS:10003
 
@@ -234,32 +235,32 @@ pkill cloudcore
 - cloudcore.service(https://raw.githubusercontent.com/kubeedge/kubeedge/master/build/tools/cloudcore.service)
 - weave 网络插件问题：https://github.com/kubeedge/kubeedge/issues/4161
 
-## 边端-Worker节点（卸载记得master节点上 kubectl delete node e-node）
+## 边缘节点
 
 ```
-multipass shell e-node
+multipass shell mec-node
 
 sudo echo "net.ipv4.ip_forward = 1" >> /etc/sysctl.conf
 sudo sysctl -p | grep ip_forward
 
 git clone https://github.com/robertzhouxh/multipass-k8s-kubeedge
-cd edge-node
+cd mec-node
 ./docker.sh
 
 wget https://github.com/kubeedge/kubeedge/releases/download/v1.13.0/keadm-v1.13.0-linux-arm64.tar.gz
 tar xzvf keadm-v1.13.0-linux-arm64.tar.gz && cp keadm-v1.13.0-linux-arm64/keadm/keadm /usr/sbin/
 
-keadm join --cloudcore-ipport=192.168.64.56:10000 --kubeedge-version=1.13.0 --token=$(keadm gettoken)  --edgenode-name=edge-node --runtimetype=docker --remote-runtime-endpoint unix:///run/containerd/containerd.sock
+keadm join --cloudcore-ipport=192.168.64.56:10000 --kubeedge-version=1.13.0 --token=$(keadm gettoken)  --edgenode-name=mec-node --runtimetype=docker --remote-runtime-endpoint unix:///run/containerd/containerd.sock
 
 eg:
 docker pull eclipse-mosquitto:1.6.15
 docker pull kubeedge/installation-package:v1.13.0
 docker pull kubeedge/pause:3.6 
 
-keadm join --cloudcore-ipport=192.168.64.56:10000 --kubeedge-version=1.13.0 --token=fd18f2a8b740c217a3f0beb79f01bdadd39c696a9cb821ab419b3ebc7c206245.eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE2ODYzNzgxODZ9.UhU1pMkvXGCF77z5R55GwnMNKTbtucsa157ri7U7R_4 --edgenode-name=e-node --runtimetype=docker --remote-runtime-endpoint unix:///run/containerd/containerd.sock
+keadm join --cloudcore-ipport=192.168.64.64:10000 --kubeedge-version=1.13.0 --token=1ad7c7e16b0ee2ff78811fb0656a797197e11972678f95bfb6bce7a02d696937.eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE2ODY0NTIwMjB9.WkMmf6PYt82czyrALQOir6dPhHCI0-EYC5QyL6rrNc8 --edgenode-name=mec-node --runtimetype=docker --remote-runtime-endpoint unix:///run/containerd/containerd.sock
 
 
-keadm join --cloudcore-ipport=192.168.64.56:10000 --kubeedge-version=1.13.0 --token=cfced7937846764a14793faa48b20e32ed6244042df17ad696a876e1c1b96ae9.eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE2ODYzNzI4MzF9.jhW8ZWhMlQFmQ4qEvE8H3-QNbwY-G5PdBbJcUdzqGWU --edgenode-name=e-worker --runtimetype=docker --remote-runtime-endpoint unix:///run/containerd/containerd.sock
+keadm join --cloudcore-ipport=192.168.64.64:10000 --kubeedge-version=1.13.0 --token=cfced7937846764a14793faa48b20e32ed6244042df17ad696a876e1c1b96ae9.eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE2ODYzNzI4MzF9.jhW8ZWhMlQFmQ4qEvE8H3-QNbwY-G5PdBbJcUdzqGWU --edgenode-name=k8s-node --runtimetype=docker --remote-runtime-endpoint unix:///run/containerd/containerd.sock
 
 
 // reboot edgecore
@@ -279,9 +280,9 @@ journalctl -u edgecore.service -f
 
     edgecore 服务正常： keadm reset
     edgecore 服务退出： systemctl disable edgecore.service && rm /etc/systemd/system/edgecore.service && rm -r /etc/kubeedge && docker rm -f mqtt
-    on Master  删节点： kubectl delete node e-node
+    on Master  删节点： kubectl delete node mec-node
 
-## 边云-Edgemesh
+## Edgemesh
 ### Master+Node 节点前置条件
 
     ```
@@ -488,8 +489,8 @@ kubectl label nodes nodeName LabelKey=LabelValue
 kbectl label nodes nodeName Labelkey-
 
 eg
-kubectl label nodes e-node node-meta.kubernetes.io/insid=ironman
-kubectl label nodes e-node node-meta.kubernetes.io-
+kubectl label nodes mec-node node-meta.kubernetes.io/insid=ironman
+kubectl label nodes mec-node node-meta.kubernetes.io-
 
 
 kubectl apply -f - <<EOF
