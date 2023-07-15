@@ -57,7 +57,6 @@ sudo mkdir -p /etc/systemd/system/docker.service.d
 sudo systemctl daemon-reload
 sudo systemctl restart docker
 
-
 # Install cri-dockerd: https://github.com/kubeedge/kubeedge/issues/4843
 VERSION=0.3.4
 wget https://github.com/Mirantis/cri-dockerd/releases/download/{VERSION}/cri-dockerd-{VERSION}.{ARCH}.tgz
