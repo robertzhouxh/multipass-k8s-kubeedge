@@ -36,8 +36,9 @@ crictl config runtime-endpoint /run/containerd/containerd.sock
 //https://github.com/kubeedge/kubeedge/issues/4521
 //https://docs.openeuler.org/zh/docs/22.09/docs/KubeEdge/KubeEdge%E9%83%A8%E7%BD%B2%E6%8C%87%E5%8D%97.html
 wget https://github.com/containernetworking/plugins/releases/download/v1.3.0/cni-plugins-linux-arm64-v1.3.0.tgz
-mkdir -p /opt/cni/bin
-tar xf cni-plugins-linux-arm64-v1.3.0.tgz -C /opt/cni/bin
+sudo mkdir -p /opt/cni/bin
+sudo tar Cxzvf /opt/cni/bin cni-plugins-linux-arm64-v1.3.0.tgz
+
 wget https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml
 
 vim kube-flannel.yml
