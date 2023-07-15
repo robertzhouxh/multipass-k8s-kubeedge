@@ -25,7 +25,7 @@ sudo apt-get update
 # 查询有哪些版本
 # apt-cache madison kubeadm
 #sudo apt-get install -y kubelet=1.23.4-00 kubeadm=1.23.4-00 kubectl=1.23.4-00
-sudo apt-get install -y kubelet=1.23.15-00 kubeadm=1.23.15-00 kubectl=1.23.15-00
+sudo apt-get install -y kubelet=1.24.10-00 kubeadm=1.24.10-00 kubectl=1.24.10-00
 
 sudo apt-mark hold kubelet kubeadm kubectl
 
