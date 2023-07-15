@@ -35,11 +35,12 @@ sudo containerd config default | sudo tee /etc/containerd/config.toml
 ## vim  /etc/containerd/config.toml    SystemdCgroup = true
 sudo sed -i 's#SystemdCgroup = false#SystemdCgroup = true#g' /etc/containerd/config.toml
 sudo sed -i "s#k8s.gcr.io#registry.cn-hangzhou.aliyuncs.com/google_containers#g"  /etc/containerd/config.toml
+sudo sed -i "s#registry.k8s.io#registry.cn-hangzhou.aliyuncs.com/google_containers#g"  /etc/containerd/config.toml
 sudo sed -i "s#https://registry-1.docker.io#https://registry.cn-hangzhou.aliyuncs.com#g"  /etc/containerd/config.toml
 
 # Restart containerd
 sudo systemctl daemon-reload
-sudo systemctl enable containerd
+sudo systemctl enable containerd --now
 sudo systemctl restart containerd
 
 # # 安装containerd需要的cni ：https://github.com/containerd/containerd/blob/main/docs/getting-started.md#step-3-installing-cni-plugins

@@ -79,45 +79,6 @@ rm -f /etc/cni/net.d/*
 注：执行完上面的操作，重启kubelet
 systemctl restart kubelet
 
---------------------------------------------------------------------------------------
-2. install weave
-参考：https://github.com/weaveworks/weave/issues/3976
-amd64: kubectl apply -f https://github.com/weaveworks/weave/releases/download/v2.8.1/weave-daemonset-k8s.yaml
-arm64: kubectl apply -f https://github.com/weaveworks/weave/releases/download/v2.8.1/weave-daemonset-k8s-1.11.yaml
-
-kubectl get pods -n kube-system
-kubectl delete ds weave-net -n kube-system
-
-
---------------------------------------------------------------------------------------
-3. install calico: https://docs.tigera.io/calico/latest/about/
-
-wget https://docs.projectcalico.org/v3.20/manifests/calico.yaml --no-check-certificate
-#把pod所在网段改成kubeadm init时选项--pod-network-cidr所指定的网段
-#直接用vim编辑打开此文件查找192，按如下标记进行修改：
-
-# no effect. This should fall within `--cluster-cidr`.
-# - name: CALICO_IPV4POOL_CIDR
-#   value: "192.168.0.0/16"
-               |
-               v
-# no effect. This should fall within `--cluster-cidr`.
-- name: CALICO_IPV4POOL_CIDR
-  value: "10.244.0.0/16"
-
-
-#查看此文件用哪些镜像：
-grep image calico.yaml
-
-   image: docker.io/calico/cni:v3.20.6
-   image: docker.io/calico/pod2daemon-flexvol:v3.20.6
-   image: docker.io/calico/node:v3.20.6
-   image: docker.io/calico/kube-controllers:v3.20.6
-
-#换成自己的版本
-for i in calico/cni:v3.20.6 calico/pod2daemon-flexvol:v3.20.6 calico/node:v3.20.6 calico/kube-controllers:v3.20.6 ; do docker pull $i ; done
-
-kubectl apply -f calico.yaml
 ```
 ### 去掉污点
 ```
