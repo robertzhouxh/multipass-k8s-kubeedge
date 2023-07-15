@@ -41,3 +41,6 @@ sudo sed -i "s#https://registry-1.docker.io#https://registry.cn-hangzhou.aliyunc
 sudo systemctl daemon-reload
 sudo systemctl enable containerd
 sudo systemctl restart containerd
+
+# 安装containerd需要的cni ：https://github.com/containerd/containerd/blob/main/docs/getting-started.md#step-3-installing-cni-plugins
+#./install-cni.sh
