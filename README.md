@@ -21,9 +21,9 @@ git clone https://github.com/robertzhouxh/multipass-k8s-kubeedge
 cd multipass-k8s-kubeedge/master-node
 
 ./containerd.sh
+crictl config runtime-endpoint /run/containerd/containerd.sock
 ./install.sh
 
-crictl config runtime-endpoint /run/containerd/containerd.sock
 ```
 
 ### 网络插件(建议安装 flannel)
@@ -136,7 +136,7 @@ kubeadm join 192.168.64.64:6443 --token zarmgo.vnwbnnh92un15qsj --discovery-toke
 swapoff -a
 kubeadm reset
 systemctl daemon-reload
-systemctl restart docker kubelet
+systemctl restart kubelet
 
 rm -rf $HOME/.kube/config
 rm -f /etc/kubernetes/kubelet.conf

@@ -35,6 +35,7 @@ sudo containerd config default | sudo tee /etc/containerd/config.toml
 ## vim  /etc/containerd/config.toml    SystemdCgroup = true
 sudo sed -i 's#SystemdCgroup = false#SystemdCgroup = true#g' /etc/containerd/config.toml
 sudo sed -i "s#k8s.gcr.io#registry.cn-hangzhou.aliyuncs.com/google_containers#g"  /etc/containerd/config.toml
+sudo sed -i "s#registry.k8s.io#registry.cn-hangzhou.aliyuncs.com/google_containers#g"  /etc/containerd/config.toml
 sudo sed -i "s#https://registry-1.docker.io#https://registry.cn-hangzhou.aliyuncs.com#g"  /etc/containerd/config.toml
 
 # Restart containerd
