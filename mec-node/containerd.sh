@@ -45,4 +45,4 @@ sudo systemctl restart containerd
 # 安装containerd需要的cni ：https://github.com/containerd/containerd/blob/main/docs/getting-started.md#step-3-installing-cni-plugins
 wget https://github.com/containernetworking/plugins/releases/download/v1.3.0/cni-plugins-linux-arm64-v1.3.0.tgz
 sudo mkdir -p /opt/cni/bin
-sudo tar Cxzvf /opt/cni/bin cni-plugins-linux-amd64-v1.3.0.tgz
+sudo tar Cxzvf /opt/cni/bin cni-plugins-linux-arm64-v1.3.0.tgz
