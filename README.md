@@ -19,7 +19,11 @@ multipass shell master
 sudo -i
 git clone https://github.com/robertzhouxh/multipass-k8s-kubeedge
 cd multipass-k8s-kubeedge/master-node
-./install-all
+
+./containerd.sh
+./install.sh
+
+crictl config runtime-endpoint /run/containerd/containerd.sock
 ```
 
 ### 网络插件(建议安装 flannel)

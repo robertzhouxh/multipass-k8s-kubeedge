@@ -41,7 +41,7 @@ sudo apt-get update && sudo apt-get install -y \
 cat <<EOF | sudo tee /etc/docker/daemon.json
 {
   "registry-mirrors":["https://bycacelf.mirror.aliyuncs.com"],
-  "exec-opts": ["native.cgroupdriver=cgroupfs"],
+  "exec-opts": ["native.cgroupdriver=systemd"],
   "log-driver": "json-file",
   "log-opts": {
     "max-size": "100m"

@@ -1,4 +1,5 @@
 # (Install Docker CE)
+
 ## Set up the repository:
 ### Install packages to allow apt to use a repository over HTTPS
 sudo apt-get update && sudo apt-get install -y \
@@ -23,7 +24,7 @@ sudo add-apt-repository \
 # Install Docker CE
 ## sudo apt-get update && sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 ## 安装特定版本, 查版本号: apt-cache madison docker-ce
-### 建议20.10
+## 建议20.10
 sudo apt-get update && sudo apt-get install -y \
   containerd.io=1.6.9-1 \
   docker-ce=5:20.10.24~3-0~ubuntu-$(lsb_release -cs) \
