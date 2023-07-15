@@ -57,3 +57,19 @@ sudo mkdir -p /etc/systemd/system/docker.service.d
 sudo systemctl daemon-reload
 sudo systemctl restart docker
 
+
+# Install cri-dockerd: https://github.com/kubeedge/kubeedge/issues/4843
+VERSION=0.3.4
+wget https://github.com/Mirantis/cri-dockerd/releases/download/{VERSION}/cri-dockerd-{VERSION}.{ARCH}.tgz
+tar zxf cri-dockerd-{VERSION}.{ARCH}.tgz 
+cp cri-dockerd/cri-dockerd /usr/local/bin/cri-dockerd
+
+wget https://raw.githubusercontent.com/Mirantis/cri-dockerd/{VERSION}/packaging/systemd/cri-docker.service
+wget https://raw.githubusercontent.com/Mirantis/cri-dockerd/{VERSION}/packaging/systemd/cri-docker.socket
+cp cri-docker.service cri-docker.socket /etc/systemd/system/
+sed -i -e 's,/usr/bin/cri-dockerd,/usr/local/bin/cri-dockerd,' /etc/systemd/system/cri-docker.service
+
+systemctl daemon-reload
+systemctl enable cri-docker.service
+systemctl enable --now cri-docker.socket
+
