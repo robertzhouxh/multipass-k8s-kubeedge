@@ -4,9 +4,11 @@
 
 runcmd:
   - cp /etc/netplan/50-cloud-init.yaml /etc/netplan/50-cloud-init.yaml.bak
+  - sed -i -e 's/extra0/enp0s2/' /etc/netplan/50-cloud-init.yaml
   - sed -i -e '13i\\            nameservers:' /etc/netplan/50-cloud-init.yaml
   - sed -i -e '14i\\                addresses:\ [8.8.8.8, 8.8.4.4]' /etc/netplan/50-cloud-init.yaml
   - netplan apply
+  - ln -sf /run/systemd/resolve/resolv.conf /etc/resolv.conf
   - systemd-resolve --status | grep 'DNS Servers' -A2
   - DEBIAN_FRONTEND=noninteractive  apt-get update -y && apt-get upgrade -y
   - apt-get -y autoremove

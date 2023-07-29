@@ -3,11 +3,58 @@
 ```
 cd multipass
 
-//创建虚拟机
-./launch-2vm.sh
+// 设置驱动
+multipass set local.driver=qemu
+
+// 设置桥接网络
+multipass networks
+
+// 输出大概是这样的
+    Name     Type         Description
+    bridge0  bridge       Network bridge with en2, en3, en4, en5
+    en0      ethernet     Ethernet
+    en1      wifi         Wi-Fi
+    en2      thunderbolt  Thunderbolt 1
+    en3      thunderbolt  Thunderbolt 2
+    en4      thunderbolt  Thunderbolt 3
+    en5      thunderbolt  Thunderbolt 4
+
+// 选择你的有线网卡名字，这里是en0, 当然你的 macos 需要接入网线，无线网卡可能不能好好工作
+// 配置桥接网络
+sudo multipass set local.bridged-network=en0
+
+multipass launch --name aibox03 -c 2 -m 2G jammy --disk 20G --bridged 
 
 注：  en0 表示要桥接的网卡
-multipass launch --name o-worker -c 2 -m 2G jammy --disk 30G --cloud-init systemd-resolved.yaml--network en0
+multipass launch --name aibox01 -c 2 -m 2G jammy --disk 30G --cloud-init systemd-resolved.yaml --network en0
+
+// 关于DNS: /etc/resolv.conf文件仍然存在，但它是由systemd-resolved服务控制的符号链接，不应手动对其进行编辑。
+// systemd-resolved是为本地服务和应用程序提供DNS名称解析的服务，可以使用Netplan进行配置，Netplan是Ubuntu 22.04的默认网络管理工具。
+// Netplan配置文件存储在/etc/netplan目录。该文件名为01-netcfg.yaml或50-cloud-init.yaml
+// 这些文件使您可以配置网络接口，我们通常称为网卡，包括IP地址，网关，DNS域名服务器等。
+
+sudo vim 50-cloud-init.yaml
+network:
+  version: 2
+  renderer: NetworkManager
+  ethernets:
+    ens3:    // 必须修改本教程中接口名称ens3为你的计算机接口名称:enp0s2。
+      dhcp4: true
+      nameservers:
+        addresses: [8.8.8.8, 8.8.4.4]
+
+// 如果您想使用Cloudflare的DNS服务器，则可以将nameservers的addresses行更改为
+ nameservers:
+          addresses: [1.1.1.1, 1.0.0.1]
+
+// 然后运行命令sudo netplan apply 应用更改。
+// 此外，还有一些应用程序依然使用/etc/resolv.conf的配置文件的DNS地址进行域名的解释，因此你还需要修改/etc/resolv.conf文件。
+// 选择和宿主机 en0 网段的那个地址对应的ip所在网卡: enp0s2
+sudo netplan apply
+sudo ln -sf /run/systemd/resolve/resolv.conf /etc/resolv.conf
+
+//创建虚拟机
+./launch-2vm.sh
 
 销虚拟机
 ./destroy.sh
