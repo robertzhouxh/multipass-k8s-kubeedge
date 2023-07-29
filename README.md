@@ -21,12 +21,13 @@ multipass networks
 
 // 选择你的有线网卡名字，这里是en0, 当然你的 macos 需要接入网线，无线网卡可能不能好好工作
 // 配置桥接网络
-sudo multipass set local.bridged-network=en0
+multipass set local.bridged-network=en0
 
-multipass launch --name aibox03 -c 2 -m 2G jammy --disk 20G --bridged 
+// 启动虚拟机
+multipass launch --name aibox02 -c 2 -m 2G jammy --disk 20G --bridged --cloud-init systemd-resolved.yaml 
 
-注：  en0 表示要桥接的网卡
-multipass launch --name aibox01 -c 2 -m 2G jammy --disk 30G --cloud-init systemd-resolved.yaml --network en0
+或者指定要桥接的网卡 en0
+multipass launch --name aibox01 -c 2 -m 2G jammy --disk 20G --cloud-init systemd-resolved.yaml --network en0
 
 // 关于DNS: /etc/resolv.conf文件仍然存在，但它是由systemd-resolved服务控制的符号链接，不应手动对其进行编辑。
 // systemd-resolved是为本地服务和应用程序提供DNS名称解析的服务，可以使用Netplan进行配置，Netplan是Ubuntu 22.04的默认网络管理工具。

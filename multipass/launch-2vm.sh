@@ -3,7 +3,3 @@
 multipass launch --name master -c 4 -m 6G jammy --disk 30G --cloud-init systemd-resolved.yaml
 multipass launch --name k8s-node -c 2 -m 2G jammy --disk 30G --cloud-init systemd-resolved.yaml
 multipass launch --name mec-node -c 2 -m 2G jammy --disk 30G --cloud-init systemd-resolved.yaml
-
-
-
-
