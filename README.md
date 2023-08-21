@@ -74,7 +74,7 @@ crictl config runtime-endpoint /run/containerd/containerd.sock
 
 ```
 
-### 网络插件(建议安装 flannel)
+### 网络插件-flannel
 ```
 --------------------------------------------------------------------------------------
 1. install flannel
@@ -148,7 +148,7 @@ openssl x509 -pubkey -in /etc/kubernetes/pki/ca.crt | openssl rsa -pubin -outfor
 
 kubeadm join 192.168.64.64:6443 --token zarmgo.vnwbnnh92un15qsj --discovery-token-ca-cert-hash sha256:30357707e093c2f74e9563d50dfb7b8c584d6983b775b5afe82684739a4a0f50
 ```
-## 重置K8S
+### 重置K8S
 ```
 swapoff -a
 kubeadm reset
@@ -163,62 +163,83 @@ iptables -F && iptables -t nat -F && iptables -t mangle -F && iptables -X
 ```
 # kubeedge 部署(https://release-1-14.docs.kubeedge.io/zh/docs/setup/install-with-keadm)
 ## 云端节点
+### 安装cloudcore
 ```
 multipass shell master
 
-/--------------------------  因为cloudcore没有污点容忍，确保master节点已经去掉污点  -------------------------------------\
-// 边缘节点上不执行kube-proxy
-kubectl edit daemonsets.apps -n kube-system kube-proxy
-
-affinity:
-  nodeAffinity:
-    requiredDuringSchedulingIgnoredDuringExecution:
-      nodeSelectorTerms:
-      - matchExpressions:
-        - key: node-role.kubernetes.io/edge
-          operator: DoesNotExist
-
-
-或者采用以下patch
+// 边缘节点上不调度 kube-proxy
 kubectl patch daemonset kube-proxy -n kube-system -p '{"spec": {"template": {"spec": {"affinity": {"nodeAffinity": {"requiredDuringSchedulingIgnoredDuringExecution": {"nodeSelectorTerms": [{"matchExpressions": [{"key": "node-role.kubernetes.io/edge", "operator": "DoesNotExist"}]}]}}}}}}}'
 
-// install kubeedge
 wget https://github.com/kubeedge/kubeedge/releases/download/v1.14.1/keadm-v1.14.1-linux-arm64.tar.gz
 tar xzvf keadm-v1.14.1-linux-arm64.tar.gz && cp keadm-v1.14.1-linux-arm64/keadm/keadm /usr/sbin/
-keadm init --advertise-address=192.168.64.81
+nerdctl image pull kubeedge/cloudcore:v1.14.1
+nerdctl image pull kubeedge/iptables-manager:v1.14.1
+
+// v1.11.0 版本之后，keadm init 将直接使用容器化方式部署云端组件 cloudcore
+keadm init --advertise-address=192.168.64.85 --profile version=v1.14.1 --kube-config=/root/.kube/config
 
 // 打开路由转发以支持 kubectl logs 
-export CLOUDCOREIPS="192.168.64.81"
+export CLOUDCOREIPS="192.168.64.85"
 echo $CLOUDCOREIPS
 iptables -t nat -A OUTPUT -p tcp --dport 10350 -j DNAT --to $CLOUDCOREIPS:10003
+
+// cloudcore k8s deployment 重启
+kubectl -n kubeedge rollout restart deployment cloudcore
+kubectl logs -f  cloudcore-59f8948f-fzph2 -n kubeedge
+
+// cloudcore daemon 方式重启
+netstat -nltp | grep cloudcore
+pkill cloudcore
+
+// 为 CloudStream 生成证书
 mkdir -p /etc/kubeedge/ 
 wget https://raw.githubusercontent.com/kubeedge/kubeedge/master/build/tools/certgen.sh
 cp certgen.sh /etc/kubeedge/ 
-
-// 为 CloudStream 生成证书
 /etc/kubeedge/certgen.sh stream
+nohup cloudcore > cloudcore.log 2>&1 &
 
-// 设置全局环境变量
-export CLOUDCOREIPS="192.168.64.81"
-
-// 验证
-netstat -nltp | grep cloudcore
-
-// 重启 cloudcore
-pkill cloudcore
-
-// logs
-kubectl logs -f  cloudcore-54b85b8757-hvt4n -n kubeedge
 ```
+### 云端Metrics-server(使用主机网络)
 
-注： 
-如果因为网络原因导致初始化失败，则可以提前把相关文件下载到/etc/kubeedge/
-- kubeedge-v1.14.1-linux-arm64.tar.gz(https://github.com/kubeedge/kubeedge/releases/download/v1.14.1/kubeedge-v1.14.1-linux-arm64.tar.gz)
-- cloudcore.service(https://raw.githubusercontent.com/kubeedge/kubeedge/master/build/tools/cloudcore.service)
+```
+1. 安装
 
+  手动（hostNetwork: true） 设置 hostNetwork=true 参考：https://support.huaweicloud.com/usermanual-cce/cce_10_0402.html
+  // Kubernetes支持Pod直接使用主机（节点）的网络，当Pod配置为hostNetwork: true时，在此Pod中运行的应用程序可以直接看到Pod所在主机的网络接口。
+  // 由于使用主机网络，访问Pod就是访问节点，要注意放通节点安全组端口，否则会出现访问不通的情况。
+  // wget https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+
+
+  1) 使用官方镜像地址直接安装
+  curl -sL https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml \
+    | sed -e "s|\(\s\+\)- args:|\1- args:\n\1  - --kubelet-insecure-tls|" | kubectl apply -f -
+  
+  2) 使用自定义镜像地址安装
+  curl -sL https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml \
+    | sed \
+      -e "s|\(\s\+\)- args:|\1- args:\n\1  - --kubelet-insecure-tls|" \
+      -e "s|registry.k8s.io/metrics-server|registry.cn-hangzhou.aliyuncs.com/google_containers|g" \
+    | kubectl apply -f -
+
+  kubectl apply -f components.yaml
+  kubectl get deployments metrics-server -n kube-system
+  kubectl patch deploy metrics-server -n kube-system --type='json' -p='[{"op":"add","path":"/spec/template/spec/containers/0/args/-","value":"--kubelet-insecure-tls"},{"op":"add","path":"/spec/template/spec/hostNetwork","value":true}]'
+
+2. 验证
+kubectl top nodes
+kubectl top pods -n kube-system 
+
+3. 删除 metrics-server
+kubectl delete -f components.yaml
+
+
+```
 ## 边缘节点（临时fq: /etc/hosts 185.199.108.133 raw.githubusercontent.com, 140.82.112.3 github.com）
-参考 https://github.com/kubeedge/kubeedge/issues/4589
-参考 https://github.com/containerd/containerd/blob/main/docs/getting-started.md#step-3-installing-cni-plugins 安装containerd+cni
+
+注意：
++ 在 v1.11.0 之前，keadm init 将以进程方式安装并运行 cloudcore，生成证书并安装 CRD。它还提供了一个命令行参数，通过它可以设置特定的版本。
++ 在 v1.11.0 之后，keadm init 集成了 Helm Chart，这意味着 cloudcore 将以容器化的方式运行。
++ 如果您仍需要使用进程的方式启动 cloudcore ，您可以使用keadm deprecated init 进行安装，
 
 ```
 multipass shell mec-node
@@ -233,9 +254,13 @@ cd mec-node
 wget https://github.com/kubeedge/kubeedge/releases/download/v1.14.1/keadm-v1.14.1-linux-arm64.tar.gz
 tar xzvf keadm-v1.14.1-linux-arm64.tar.gz && cp keadm-v1.14.1-linux-arm64/keadm/keadm /usr/sbin/
 
-keadm join --cloudcore-ipport=192.168.64.81:10000 --kubeedge-version=1.14.1 --token=$(keadm gettoken)  --edgenode-name=mec-node 
+nerdctl image pull docker.io/kubeedge/installation-package:v1.14.1
+nerdctl image pull docker.io/kubeedge/pause:3.6
+nerdctl image pull docker.io/library/eclipse-mosquitto:1.6.15
 
-2d336b44a30f886bf7d9b378cf63d09a9efb984c645c7ca273d5a02e2ce90b85.eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE2OTI2MjY3Nzd9.s7Lmmvruhv73KRiZ283kkyTiwndFn-yzOxCvH8jC6K8
+keadm join --cloudcore-ipport=192.168.64.85:10000 --runtimetype remote --remote-runtime-endpoint unix:///run/containerd/containerd.sock --kubeedge-version=1.14.1 --with-mqtt --edgenode-name=mec-node --token=$(keadm gettoken) 
+
+a7c60d6e11feb64d7dc3aed4b20f301131970c7e5061afe76501ce015221e17f.eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE2OTI2ODgwNzV9.N2XKmao1PBBcgDz_Xdz5iifysXm5A-B1NPHYjM_HEZo
 
 // reboot edgecore
 systemctl restart edgecore.service
@@ -243,7 +268,7 @@ systemctl status edgecore.service
 journalctl -u edgecore.service -f
 ```
 
-### 卸载EdgeCore
+## 卸载EdgeCore
 
     edgecore 服务正常： keadm reset
     edgecore 服务退出： systemctl disable edgecore.service && rm /etc/systemd/system/edgecore.service && rm -r /etc/kubeedge && docker rm -f mqtt
@@ -251,15 +276,8 @@ journalctl -u edgecore.service -f
 
 ## Edgemesh
 ### Master+Node 节点前置条件
-
     ```
-    1. 去除 K8s master 节点的污点
-    kubectl taint nodes --all node-role.kubernetes.io/master-
-
-    2: 给 Kubernetes API 服务添加过滤标签
-    kubectl label services kubernetes service.edgemesh.kubeedge.io/service-proxy-name=""
-
-    3. 启用 KubeEdge 的边缘 Kube-API 端点服务
+    启用 KubeEdge 的边缘 Kube-API 端点服务
 
     3.1 在云端，开启 dynamicController 模块，配置完成后，需要重启 cloudcore
 
@@ -351,8 +369,15 @@ http://192.168.64.64:9090
 Tricks: 
 mac: cat ~/.kube/config | pbcopy
 
+# 定位问题
+
 ## master 节点操作
+
 ```
+
+0. 给 Kubernetes API 服务添加过滤标签
+kubectl label services kubernetes service.edgemesh.kubeedge.io/service-proxy-name=""
+
 1. 操作镜像
 kubectl exec -n namespace pods-name -it -- /bin/bash
 
@@ -371,6 +396,19 @@ kubectl create -f name.yaml
 6.根据yaml删除
 kubectl delete -f name.yaml
     ```
+
+https://www.cnblogs.com/hahaha111122222/p/16445834.html
+要使用systemdcgroup驱动程序，请在 /etc/containerd/config.toml 中进行设置plugins.cri.systemd_cgroup = true
+
+For containerd:
+
+$ nerdctl ps -a --namespace k8s.io
+$ nerdctl rm 84d2a565793ce8ed658488500612287840f4a81225491611c1ee21dc7f4162cc --namespace k8s.io
+
++ kubectl get cm -n kube-system
++ kubectl edit cm kubelet-config-1.22 -n kube-system
++ nerdctl info | grep system
+
 ## 定制 Pod 的 DNS 策略
 
 DNS 策略可以逐个 Pod 来设定。目前 Kubernetes 支持以下特定 Pod 的 DNS 策略。 这些策略可以在 Pod 规约中的 dnsPolicy 字段设置：
@@ -433,20 +471,6 @@ nameserver xxx
 search default.svc.cluster.local svc.cluster.local cluster.local localdomain
 options ndots:5
 ```
-
-# 定位问题
-
-https://www.cnblogs.com/hahaha111122222/p/16445834.html
-要使用systemdcgroup驱动程序，请在 /etc/containerd/config.toml 中进行设置plugins.cri.systemd_cgroup = true
-
-For containerd:
-
-$ nerdctl ps -a --namespace k8s.io
-$ nerdctl rm 84d2a565793ce8ed658488500612287840f4a81225491611c1ee21dc7f4162cc --namespace k8s.io
-
-+ kubectl get cm -n kube-system
-+ kubectl edit cm kubelet-config-1.22 -n kube-system
-+ nerdctl info | grep system
 
 ## Master
 
@@ -518,4 +542,5 @@ kubectl exec --stdin --tty busybox-sleep -- /bin/sh
     journalctl -u edgecore.service -xe
 
 ```
+
 
