@@ -44,6 +44,9 @@ sudo systemctl restart kubelet
 # ---------------------------------------------------------------------------------------
 # install k8s from aliyun repository
 # kubeadm init
+echo "===> 开始安装 K8S"
+echo ""
+
 kubeadm init \
   --image-repository registry.aliyuncs.com/google_containers \
   --service-cidr=10.96.0.0/12 \
@@ -57,3 +60,5 @@ sudo chown $(id -u):$(id -g) $HOME/.kube/config
 
 export KUBECONFIG=/etc/kubernetes/admin.conf
 
+echo "K8S 安装结束！"
+echo ""

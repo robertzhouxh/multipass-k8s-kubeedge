@@ -1,3 +1,6 @@
+echo "===> 初始化系统"
+echo ""
+
 cat <<EOF | sudo tee /etc/modules-load.d/containerd.conf
 overlay
 br_netfilter
@@ -23,15 +26,17 @@ ntpdate ntp.ntsc.ac.cn
 # 最后查看一下时间
 hwclock
 
+echo "===> 安装 Containerd"
+echo ""
 # ------------------------------------------------------------------
-# (Install containerd) 
-#https://github.com/containerd/containerd/blob/main/docs/getting-started.md#step-3-installing-cni-plugins
-
+# (Install containerd)- 或者 https://github.com/containerd/containerd/blob/main/docs/getting-started.md#step-3-installing-cni-plugins
 sudo apt-get update && sudo apt-get install -y containerd
 
 # Configure containerd
 sudo mkdir -p /etc/containerd
 sudo containerd config default | sudo tee /etc/containerd/config.toml
+
+## Change CgroupDriver to systemd
 # sudo sed -i 's#systemd_cgroup = false#systemd_cgroup = true#g' /etc/containerd/config.toml
 sudo sed -i 's#SystemdCgroup = false#SystemdCgroup = true#g' /etc/containerd/config.toml
 sudo sed -i "s#k8s.gcr.io#registry.cn-hangzhou.aliyuncs.com/google_containers#g"  /etc/containerd/config.toml
@@ -43,6 +48,8 @@ sudo systemctl daemon-reload
 sudo systemctl enable containerd
 sudo systemctl restart containerd
 
+echo "===> 安装 CNI"
+echo ""
 # Install CNI
 wget https://github.com/containernetworking/plugins/releases/download/v1.3.0/cni-plugins-linux-arm64-v1.3.0.tgz
 sudo mkdir -p /opt/cni/bin
@@ -82,9 +89,13 @@ cat > /etc/cni/net.d/10-containerd-net.conflist <<EOF
     }
 EOF
 
+echo "===> 安装 nerdcrl"
+echo ""
 wget https://github.com/containerd/nerdctl/releases/download/v1.5.0/nerdctl-1.5.0-linux-arm64.tar.gz
 tar Cxzvvf /usr/local/bin nerdctl-1.5.0-linux-arm64.tar.gz
 
+echo "===> 重启 containerd"
+echo ""
 # Restart containerd
 sudo systemctl daemon-reload
 sudo systemctl enable containerd

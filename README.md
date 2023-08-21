@@ -439,6 +439,11 @@ options ndots:5
 https://www.cnblogs.com/hahaha111122222/p/16445834.html
 要使用systemdcgroup驱动程序，请在 /etc/containerd/config.toml 中进行设置plugins.cri.systemd_cgroup = true
 
+For containerd:
+
+$ nerdctl ps -a --namespace k8s.io
+$ nerdctl rm 84d2a565793ce8ed658488500612287840f4a81225491611c1ee21dc7f4162cc --namespace k8s.io
+
 + kubectl get cm -n kube-system
 + kubectl edit cm kubelet-config-1.22 -n kube-system
 + nerdctl info | grep system
