@@ -130,6 +130,17 @@ spec:
       labels:
         k8s-app: metrics-server
     spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  #Specify which label in [kubectl get nodes --show-labels] you want to match
+                  - key: kubernetes.io/hostname
+                    operator: In
+                    values:
+                      #Specify the value in key
+                      - master
       hostNetwork: true
       containers:
       - args:
