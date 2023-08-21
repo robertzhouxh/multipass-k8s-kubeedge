@@ -199,11 +199,68 @@ cp certgen.sh /etc/kubeedge/
 nohup cloudcore > cloudcore.log 2>&1 &
 
 ```
-### 云端Metrics-server(使用主机网络)
+## 边缘节点（临时fq: /etc/hosts 185.199.108.133 raw.githubusercontent.com, 140.82.112.3 github.com）
+
+注意：
++ 在 v1.11.0 之前，keadm init 将以进程方式安装并运行 cloudcore，生成证书并安装 CRD。它还提供了一个命令行参数，通过它可以设置特定的版本。
++ 在 v1.11.0 之后，keadm init 集成了 Helm Chart，这意味着 cloudcore 将以容器化的方式运行。
++ 如果您仍需要使用进程的方式启动 cloudcore ，您可以使用keadm deprecated init 进行安装，
 
 ```
+multipass shell mec-node
+
+sudo echo "net.ipv4.ip_forward = 1" >> /etc/sysctl.conf
+sudo sysctl -p | grep ip_forward
+
+git clone -b kueedge-1.4.0 https://github.com/robertzhouxh/multipass-k8s-kubeedge
+cd mec-node
+./containerd.sh
+
+wget https://github.com/kubeedge/kubeedge/releases/download/v1.14.1/keadm-v1.14.1-linux-arm64.tar.gz
+tar xzvf keadm-v1.14.1-linux-arm64.tar.gz && cp keadm-v1.14.1-linux-arm64/keadm/keadm /usr/sbin/
+
+nerdctl image pull docker.io/kubeedge/installation-package:v1.14.1
+nerdctl image pull docker.io/kubeedge/pause:3.6
+nerdctl image pull docker.io/library/eclipse-mosquitto:1.6.15
+
+keadm join --cloudcore-ipport=192.168.64.85:10000 --runtimetype remote --remote-runtime-endpoint unix:///run/containerd/containerd.sock --kubeedge-version=1.14.1 --with-mqtt --edgenode-name=mec-node --token=$(keadm gettoken) 
+
+116513e869dfa4da337bae5558f989f9fe41761733de998a25a1308c724e19bf.eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE2OTI2OTAzOTJ9.MpsE4RShIQ1Ii28E5Th9jhFR8isuj_KoWoQUImWrBT0
+
+// reboot edgecore
+systemctl restart edgecore.service
+systemctl status edgecore.service
+journalctl -u edgecore.service -f
+```
+
+### 云端Metrics-server(使用主机网络)
+
+在部署 metrics-server 之前，必须确保将其部署在已部署 apiserver 的节点上。在这种情况下，这就是 master 节点。作为结果，需要通过以下命令使主节点可调度：
+
+kubectl taint nodes --all node-role.kubernetes.io/master-
+
+然后，在 deployment.yaml 文件中，必须指定 metrics-server 部署在主节点上。（选择主机名作为标记的标签。）
+
+在metrics-server-deployment.yaml中
+
+```
+spec:
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+          - matchExpressions:
+              #Specify which label in [kubectl get nodes --show-labels] you want to match
+              - key: kubernetes.io/hostname
+                operator: In
+                values:
+                  #Specify the value in key
+                  - master
+```
+
 1. 安装
 
+```
   手动（hostNetwork: true） 设置 hostNetwork=true 参考：https://support.huaweicloud.com/usermanual-cce/cce_10_0402.html
   // Kubernetes支持Pod直接使用主机（节点）的网络，当Pod配置为hostNetwork: true时，在此Pod中运行的应用程序可以直接看到Pod所在主机的网络接口。
   // 由于使用主机网络，访问Pod就是访问节点，要注意放通节点安全组端口，否则会出现访问不通的情况。
@@ -232,40 +289,6 @@ kubectl top pods -n kube-system
 3. 删除 metrics-server
 kubectl delete -f components.yaml
 
-
-```
-## 边缘节点（临时fq: /etc/hosts 185.199.108.133 raw.githubusercontent.com, 140.82.112.3 github.com）
-
-注意：
-+ 在 v1.11.0 之前，keadm init 将以进程方式安装并运行 cloudcore，生成证书并安装 CRD。它还提供了一个命令行参数，通过它可以设置特定的版本。
-+ 在 v1.11.0 之后，keadm init 集成了 Helm Chart，这意味着 cloudcore 将以容器化的方式运行。
-+ 如果您仍需要使用进程的方式启动 cloudcore ，您可以使用keadm deprecated init 进行安装，
-
-```
-multipass shell mec-node
-
-sudo echo "net.ipv4.ip_forward = 1" >> /etc/sysctl.conf
-sudo sysctl -p | grep ip_forward
-
-git clone -b kueedge-1.4.0 https://github.com/robertzhouxh/multipass-k8s-kubeedge
-cd mec-node
-./containerd.sh
-
-wget https://github.com/kubeedge/kubeedge/releases/download/v1.14.1/keadm-v1.14.1-linux-arm64.tar.gz
-tar xzvf keadm-v1.14.1-linux-arm64.tar.gz && cp keadm-v1.14.1-linux-arm64/keadm/keadm /usr/sbin/
-
-nerdctl image pull docker.io/kubeedge/installation-package:v1.14.1
-nerdctl image pull docker.io/kubeedge/pause:3.6
-nerdctl image pull docker.io/library/eclipse-mosquitto:1.6.15
-
-keadm join --cloudcore-ipport=192.168.64.85:10000 --runtimetype remote --remote-runtime-endpoint unix:///run/containerd/containerd.sock --kubeedge-version=1.14.1 --with-mqtt --edgenode-name=mec-node --token=$(keadm gettoken) 
-
-a7c60d6e11feb64d7dc3aed4b20f301131970c7e5061afe76501ce015221e17f.eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE2OTI2ODgwNzV9.N2XKmao1PBBcgDz_Xdz5iifysXm5A-B1NPHYjM_HEZo
-
-// reboot edgecore
-systemctl restart edgecore.service
-systemctl status edgecore.service
-journalctl -u edgecore.service -f
 ```
 
 ## 卸载EdgeCore
