@@ -41,7 +41,7 @@ sudo apt-get update && sudo apt-get install -y \
 cat <<EOF | sudo tee /etc/docker/daemon.json
 {
   "registry-mirrors":["https://bycacelf.mirror.aliyuncs.com"],
-  "exec-opts": ["native.cgroupdriver=cgroupfs"],
+  "exec-opts": ["native.cgroupdriver=systemd"],
   "log-driver": "json-file",
   "log-opts": {
     "max-size": "100m"
@@ -56,3 +56,23 @@ sudo mkdir -p /etc/systemd/system/docker.service.d
 # Restart Docker
 sudo systemctl daemon-reload
 sudo systemctl restart docker
+
+# Install cri-dockerd: https://github.com/kubeedge/kubeedge/issues/4843
+VERSION=0.3.4
+wget https://github.com/Mirantis/cri-dockerd/releases/download/{VERSION}/cri-dockerd-{VERSION}.{ARCH}.tgz
+tar zxf cri-dockerd-{VERSION}.{ARCH}.tgz 
+cp cri-dockerd/cri-dockerd /usr/local/bin/cri-dockerd
+
+wget https://raw.githubusercontent.com/Mirantis/cri-dockerd/{VERSION}/packaging/systemd/cri-docker.service
+wget https://raw.githubusercontent.com/Mirantis/cri-dockerd/{VERSION}/packaging/systemd/cri-docker.socket
+cp cri-docker.service cri-docker.socket /etc/systemd/system/
+sed -i -e 's,/usr/bin/cri-dockerd,/usr/local/bin/cri-dockerd,' /etc/systemd/system/cri-docker.service
+
+systemctl daemon-reload
+systemctl enable cri-docker.service
+systemctl enable --now cri-docker.socket
+
+# https://github.com/containerd/containerd/blob/main/docs/getting-started.md#step-3-installing-cni-plugins
+wget https://github.com/containernetworking/plugins/releases/download/v1.3.0/cni-plugins-linux-arm64-v1.3.0.tgz
+sudo mkdir -p /opt/cni/bin
+sudo tar Cxzvf /opt/cni/bin cni-plugins-linux-arm64-v1.3.0.tgz

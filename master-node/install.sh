@@ -29,8 +29,8 @@ sudo apt-get update
 # apt-cache madison kubeadm
 #sudo apt-get install -y kubelet=1.20.0-00 kubeadm=1.20.0-00 kubectl=1.20.0-00
 #sudo apt-get install -y kubelet=1.23.4-00 kubeadm=1.23.4-00 kubectl=1.23.4-00
-sudo apt-get install -y kubelet=1.23.15-00 kubeadm=1.23.15-00 kubectl=1.23.15-00
-
+#sudo apt-get install -y kubelet=1.23.15-00 kubeadm=1.23.15-00 kubectl=1.23.15-00
+sudo apt-get install -y kubelet=1.22.17-00 kubeadm=1.22.17-00 kubectl=1.22.17-00
 
 sudo apt-mark hold kubelet kubeadm kubectl
 
@@ -44,11 +44,15 @@ sudo systemctl restart kubelet
 # ---------------------------------------------------------------------------------------
 # install k8s from aliyun repository
 # kubeadm init
+echo "===> 开始安装 K8S"
+echo ""
+
 kubeadm init \
   --image-repository registry.aliyuncs.com/google_containers \
   --service-cidr=10.96.0.0/12 \
   --pod-network-cidr=10.244.0.0/16 \
-  --kubernetes-version v1.23.15
+  --kubernetes-version v1.22.17 \
+  --cri-socket=unix:///run/containerd/containerd.sock
 
 mkdir -p $HOME/.kube
 sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
@@ -56,3 +60,5 @@ sudo chown $(id -u):$(id -g) $HOME/.kube/config
 
 export KUBECONFIG=/etc/kubernetes/admin.conf
 
+echo "K8S 安装结束！"
+echo ""

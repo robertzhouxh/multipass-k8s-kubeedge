@@ -100,4 +100,3 @@ echo ""
 sudo systemctl daemon-reload
 sudo systemctl enable containerd
 sudo systemctl restart containerd
-
