@@ -230,9 +230,22 @@ nerdctl image pull docker.io/kubeedge/installation-package:v1.14.2
 nerdctl image pull docker.io/kubeedge/pause:3.6
 nerdctl image pull docker.io/library/eclipse-mosquitto:1.6.15
 
-keadm join --cloudcore-ipport=192.168.64.85:10000 --runtimetype remote --remote-runtime-endpoint unix:///run/containerd/containerd.sock --kubeedge-version=1.14.2 --with-mqtt --edgenode-name=mec-node --token=$(keadm gettoken) 
+// keadm gettoken
+keadm join --cloudcore-ipport=192.168.64.88:10000 \
+    --with-mqtt=false \
+    --runtimetype remote \
+    --remote-runtime-endpoint unix:///run/containerd/containerd.sock \
+    --kubeedge-version=1.14.2 \
+    --edgenode-name=mec-n0 \
+    --token=44782bd6c311a356554e2528e04744073448154d3f74242ba2cd5a6afbdf656c.eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE2OTQwNjg4MDh9.kL9GKvFMlwrf0NVmRWqtd5SR_SbxpTSWrb2F8DafMq8
+    
+//如果报错： 
+failed to create containerd task: failed to create shim task: OCI runtime create failed: runc create failed: expected cgroupsPath to be of format "slice:prefix:name" for systemd cgroups
 
-116513e869dfa4da337bae5558f989f9fe41761733de998a25a1308c724e19bf.eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE2OTI2OTAzOTJ9.MpsE4RShIQ1Ii28E5Th9jhFR8isuj_KoWoQUImWrBT0
+则将边缘节点的SystemdGroup 关闭
+sudo sed -i 's#SystemdCgroup = true#SystemdCgroup = false#g' /etc/containerd/config.toml
+sudo systemctl restart containerd
+
 
 // reboot edgecore
 systemctl restart edgecore.service

@@ -38,6 +38,7 @@ sudo containerd config default | sudo tee /etc/containerd/config.toml
 
 ## Change CgroupDriver to systemd
 # sudo sed -i 's#systemd_cgroup = false#systemd_cgroup = true#g' /etc/containerd/config.toml
+## from https://cloud.tencent.com/document/product/457/51237
 sudo sed -i 's#SystemdCgroup = false#SystemdCgroup = true#g' /etc/containerd/config.toml
 sudo sed -i "s#k8s.gcr.io#registry.cn-hangzhou.aliyuncs.com/google_containers#g"  /etc/containerd/config.toml
 sudo sed -i "s#registry.k8s.io#registry.cn-hangzhou.aliyuncs.com/google_containers#g"  /etc/containerd/config.toml
