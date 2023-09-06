@@ -127,11 +127,10 @@ rm -f /etc/cni/net.d/*
 systemctl restart kubelet
 
 ```
-### 去掉污点
+### 去掉Master 节点污点（以部署调度相关资源）
 ```
 kubectl describe nodes master | grep Taints
 kubectl taint node master node-role.kubernetes.io/master-
-kubectl taint nodes --all node-role.kubernetes.io/master-
 
 ```
 ## Step3.[可选]k8s节点join
@@ -175,18 +174,26 @@ nerdctl image pull kubeedge/cloudcore:v1.14.2
 nerdctl image pull kubeedge/iptables-manager:v1.14.2
 
 // v1.11.0 版本之后，keadm init 将直接使用容器化方式部署云端组件 cloudcore
-keadm init --advertise-address=192.168.64.85 --profile version=v1.14.2 --kube-config=/root/.kube/config
+keadm init --advertise-address=192.168.64.88 --profile version=v1.14.2 --kube-config=/root/.kube/config
 
 // 打开路由转发以支持 kubectl logs 
-export CLOUDCOREIPS="192.168.64.85"
+export CLOUDCOREIPS="192.168.64.88"
 echo $CLOUDCOREIPS
 iptables -t nat -A OUTPUT -p tcp --dport 10350 -j DNAT --to $CLOUDCOREIPS:10003
 
-// cloudcore k8s deployment 重启
+
+#####################################
+# cloudcore k8s deployment 重启 
+
 kubectl -n kubeedge rollout restart deployment cloudcore
 kubectl logs -f  cloudcore-59f8948f-fzph2 -n kubeedge
+#####################################
 
-// cloudcore daemon 方式重启
+
+
+#####################################
+# cloudcore daemon 方式重启
+
 netstat -nltp | grep cloudcore
 pkill cloudcore
 
@@ -196,6 +203,7 @@ wget https://raw.githubusercontent.com/kubeedge/kubeedge/master/build/tools/cert
 cp certgen.sh /etc/kubeedge/ 
 /etc/kubeedge/certgen.sh stream
 nohup cloudcore > cloudcore.log 2>&1 &
+#####################################
 
 ```
 ## 边缘节点（临时fq: /etc/hosts 185.199.108.133 raw.githubusercontent.com, 140.82.112.3 github.com）
