@@ -65,7 +65,7 @@ sudo ln -sf /run/systemd/resolve/resolv.conf /etc/resolv.conf
 ```
 multipass shell master
 sudo -i
-git clone -b kueedge-1.4.0 https://github.com/robertzhouxh/multipass-k8s-kubeedge
+git clone https://github.com/robertzhouxh/multipass-k8s-kubeedge
 cd multipass-k8s-kubeedge/master-node
 
 ./containerd.sh
@@ -170,13 +170,13 @@ multipass shell master
 // 边缘节点上不调度 kube-proxy
 kubectl patch daemonset kube-proxy -n kube-system -p '{"spec": {"template": {"spec": {"affinity": {"nodeAffinity": {"requiredDuringSchedulingIgnoredDuringExecution": {"nodeSelectorTerms": [{"matchExpressions": [{"key": "node-role.kubernetes.io/edge", "operator": "DoesNotExist"}]}]}}}}}}}'
 
-wget https://github.com/kubeedge/kubeedge/releases/download/v1.14.1/keadm-v1.14.1-linux-arm64.tar.gz
-tar xzvf keadm-v1.14.1-linux-arm64.tar.gz && cp keadm-v1.14.1-linux-arm64/keadm/keadm /usr/sbin/
-nerdctl image pull kubeedge/cloudcore:v1.14.1
-nerdctl image pull kubeedge/iptables-manager:v1.14.1
+wget https://github.com/kubeedge/kubeedge/releases/download/v1.14.2/keadm-v1.14.2-linux-arm64.tar.gz
+tar xzvf keadm-v1.14.2-linux-arm64.tar.gz && cp keadm-v1.14.2-linux-arm64/keadm/keadm /usr/sbin/
+nerdctl image pull kubeedge/cloudcore:v1.14.2
+nerdctl image pull kubeedge/iptables-manager:v1.14.2
 
 // v1.11.0 版本之后，keadm init 将直接使用容器化方式部署云端组件 cloudcore
-keadm init --advertise-address=192.168.64.85 --profile version=v1.14.1 --kube-config=/root/.kube/config
+keadm init --advertise-address=192.168.64.85 --profile version=v1.14.2 --kube-config=/root/.kube/config
 
 // 打开路由转发以支持 kubectl logs 
 export CLOUDCOREIPS="192.168.64.85"
@@ -212,18 +212,18 @@ multipass shell mec-node
 sudo echo "net.ipv4.ip_forward = 1" >> /etc/sysctl.conf
 sudo sysctl -p | grep ip_forward
 
-git clone -b kueedge-1.4.0 https://github.com/robertzhouxh/multipass-k8s-kubeedge
+git clone https://github.com/robertzhouxh/multipass-k8s-kubeedge
 cd mec-node
 ./containerd.sh
 
-wget https://github.com/kubeedge/kubeedge/releases/download/v1.14.1/keadm-v1.14.1-linux-arm64.tar.gz
-tar xzvf keadm-v1.14.1-linux-arm64.tar.gz && cp keadm-v1.14.1-linux-arm64/keadm/keadm /usr/sbin/
+wget https://github.com/kubeedge/kubeedge/releases/download/v1.14.2/keadm-v1.14.2-linux-arm64.tar.gz
+tar xzvf keadm-v1.14.2-linux-arm64.tar.gz && cp keadm-v1.14.2-linux-arm64/keadm/keadm /usr/sbin/
 
-nerdctl image pull docker.io/kubeedge/installation-package:v1.14.1
+nerdctl image pull docker.io/kubeedge/installation-package:v1.14.2
 nerdctl image pull docker.io/kubeedge/pause:3.6
 nerdctl image pull docker.io/library/eclipse-mosquitto:1.6.15
 
-keadm join --cloudcore-ipport=192.168.64.85:10000 --runtimetype remote --remote-runtime-endpoint unix:///run/containerd/containerd.sock --kubeedge-version=1.14.1 --with-mqtt --edgenode-name=mec-node --token=$(keadm gettoken) 
+keadm join --cloudcore-ipport=192.168.64.85:10000 --runtimetype remote --remote-runtime-endpoint unix:///run/containerd/containerd.sock --kubeedge-version=1.14.2 --with-mqtt --edgenode-name=mec-node --token=$(keadm gettoken) 
 
 116513e869dfa4da337bae5558f989f9fe41761733de998a25a1308c724e19bf.eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE2OTI2OTAzOTJ9.MpsE4RShIQ1Ii28E5Th9jhFR8isuj_KoWoQUImWrBT0
 
