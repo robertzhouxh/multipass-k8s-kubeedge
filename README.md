@@ -69,7 +69,6 @@ git clone https://github.com/robertzhouxh/multipass-k8s-kubeedge
 cd multipass-k8s-kubeedge/master-node
 
 ./containerd.sh
-crictl config runtime-endpoint /run/containerd/containerd.sock
 ./install.sh
 
 ```
