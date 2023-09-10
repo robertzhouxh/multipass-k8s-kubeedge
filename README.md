@@ -231,13 +231,17 @@ nerdctl image pull docker.io/kubeedge/pause:3.6
 nerdctl image pull docker.io/library/eclipse-mosquitto:1.6.15
 
 // keadm gettoken
-keadm join --cloudcore-ipport=192.168.64.88:10000 \
+ --cgroupdriver=systemd
+
+
+keadm join --cloudcore-ipport=139.9.209.146:10000 \
     --with-mqtt=false \
     --runtimetype remote \
     --remote-runtime-endpoint unix:///run/containerd/containerd.sock \
     --kubeedge-version=1.14.2 \
-    --edgenode-name=mec-n0 \
-    --token=44782bd6c311a356554e2528e04744073448154d3f74242ba2cd5a6afbdf656c.eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE2OTQwNjg4MDh9.kL9GKvFMlwrf0NVmRWqtd5SR_SbxpTSWrb2F8DafMq8
+    --edgenode-name=mec-n2 \
+   --cgroupdriver=systemd \
+    --token=9a8db6ba17dce5d962fd5de1cfe9266c039e5d5067f938e6a62ad0f70c697fbe.eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE2OTQwNzE0OTZ9.9sdDE1KnDfepgjfdA5ireJw9TItXO1u3_u2q9TdPJ8w
     
 //如果报错： 
 failed to create containerd task: failed to create shim task: OCI runtime create failed: runc create failed: expected cgroupsPath to be of format "slice:prefix:name" for systemd cgroups
